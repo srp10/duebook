@@ -43,6 +43,16 @@ def add_deadline(title: str, due: str, kind: str, source: str, confidence: float
     return str(vault.add_deadline(VAULT_DIR, title, due, kind, source, confidence))
 
 
+@mcp.tool()
+def find_conflicts(window_days: int = 7) -> list[dict]:
+    """Find pairs of open deadlines due within `window_days` of each other.
+
+    Each result has the two deadlines (a, b), days_apart, and a one-sentence
+    plain-English explanation of the clash. Hard deadlines are listed first.
+    """
+    return vault.find_conflicts(VAULT_DIR, window_days)
+
+
 def main() -> None:
     VAULT_DIR.mkdir(parents=True, exist_ok=True)
     mcp.run(transport="streamable-http")

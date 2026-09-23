@@ -124,3 +124,34 @@ def list_due(vault_dir: Path, window_days: int = 30, today: date | None = None) 
     end = today + timedelta(days=window_days)
     due = [d for d in read_all(vault_dir) if d.status == "open" and today <= d.due <= end]
     return [d.summary() for d in sorted(due, key=lambda d: d.due)]
+
+
+def find_conflicts(vault_dir: Path, window_days: int = 7) -> list[dict]:
+    """Pairs of open deadlines due within `window_days` of each other, earliest pair first."""
+    open_ = sorted((d for d in read_all(vault_dir) if d.status == "open"), key=lambda d: d.due)
+    conflicts = []
+    for i, a in enumerate(open_):
+        for b in open_[i + 1 :]:
+            gap = (b.due - a.due).days
+            if gap > window_days:
+                break  # sorted by due, so every later b is further away
+            first, second = (b, a) if (b.kind, a.kind) == ("hard", "soft") else (a, b)
+            conflicts.append(
+                {
+                    "a": first.summary(),
+                    "b": second.summary(),
+                    "days_apart": gap,
+                    "explanation": f"{_label(first)} collides with {_label(second)}, {_gap(gap)}.",
+                }
+            )
+    return conflicts
+
+
+def _label(d: Deadline) -> str:
+    return f"{d.title} ({d.kind}, {d.due.day} {d.due:%b})"
+
+
+def _gap(n: int) -> str:
+    if n == 0:
+        return "both due the same day"
+    return f"{n} day{'s' if n > 1 else ''} apart"
