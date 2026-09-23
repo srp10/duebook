@@ -25,3 +25,14 @@ Format: task attempted · steps · expected vs actual · severity · workaround 
 - **Severity:** Low. It took about a minute, but it's a step the hackathon quick-start doesn't mention.
 - **Workaround:** `brew install uv && uv python install 3.12`. uv-managed Python leaves the system Python alone.
 - **Suggestion:** Hackathon starter docs should list `uv` as a prerequisite with the one-line install.
+
+## 3. FastMCP defaults: stdio transport, and list results wrapped in `{"result": ...}`
+
+- **Task attempted:** Serve `list_due` over Streamable HTTP and check what the client gets back.
+- **Steps:** `FastMCP("duebook")` with a `@mcp.tool()` that returns `list[dict]`, then called it with the SDK's `streamablehttp_client`.
+- **Expected vs actual:**
+  - `FastMCP.run()` defaults to `transport="stdio"`. Streamable HTTP only runs if you pass `transport="streamable-http"` explicitly. If you forget, the process sits waiting on stdin with no error.
+  - A tool returning a list comes back as `structuredContent = {"result": [...]}`, not the bare list. The wrapper key isn't in the tool docstring or the quick-start.
+- **Severity:** Low.
+- **Workaround:** Always pass the transport explicitly. Accept the `result` wrapper (clients see the same data in `content` text too).
+- **Suggestion:** Log the active transport and URL at start-up. Document the structured-output wrapping rule next to the `@tool` decorator.
