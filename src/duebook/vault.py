@@ -120,6 +120,7 @@ def add_deadline(
 
 def list_due(vault_dir: Path, window_days: int = 30, today: date | None = None) -> list[dict]:
     """Open deadlines due between today and today + window_days, soonest first."""
+    # TODO(week 2): return overdue open items first, flagged as overdue.
     today = today or date.today()
     end = today + timedelta(days=window_days)
     due = [d for d in read_all(vault_dir) if d.status == "open" and today <= d.due <= end]

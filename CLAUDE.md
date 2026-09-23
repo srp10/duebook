@@ -48,3 +48,6 @@ Document ingestion · Bedrock · Strands/AgentCore · Alexa+ Agent Skill or simu
 - Every "ugh" — a doc gap, a transport surprise, a confusing error — goes into `FRICTION.md` as: task attempted · steps · expected vs actual · severity · workaround · suggestion. This file is part of the submission.
 - Ask before adding a dependency beyond the MCP SDK, pyyaml, pytest, ruff.
 - Never put real names, addresses or document numbers in `vault/` or tests.
+
+## Week 2 notes (backlog — not in scope for Spike A)
+- `list_due` should return overdue open items first, flagged as overdue (Spike A only returns today → today + window).
