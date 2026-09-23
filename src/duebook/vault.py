@@ -82,6 +82,42 @@ def _as_date(value) -> date:
     return value if isinstance(value, date) else date.fromisoformat(str(value))
 
 
+def add_deadline(
+    vault_dir: Path,
+    title: str,
+    due: str,
+    kind: str,
+    source: str,
+    confidence: float = 0.8,
+) -> Path:
+    """Write a new open deadline to the vault. Refuses a duplicate title + due."""
+    title = title.strip()
+    if not title:
+        raise ValueError("title must not be empty")
+    try:
+        due_date = date.fromisoformat(due)
+    except ValueError:
+        raise ValueError(f"due must be an ISO date (YYYY-MM-DD), got {due!r}") from None
+    if kind not in ("hard", "soft"):
+        raise ValueError(f"kind must be 'hard' or 'soft', got {kind!r}")
+    if not 0 <= confidence <= 1:
+        raise ValueError(f"confidence must be between 0 and 1, got {confidence}")
+
+    slug = slugify(title, due_date)
+    for existing in read_all(vault_dir):
+        if slugify(existing.title, existing.due) == slug:
+            raise ValueError(
+                f"duplicate: {existing.title!r} due {existing.due} already exists "
+                f"at {existing.path.name}"
+            )
+
+    path = vault_dir / f"{slug}.md"
+    d = Deadline(title=title, due=due_date, kind=kind, source=source, confidence=confidence)
+    with path.open("x", encoding="utf-8") as f:  # "x" never overwrites an existing file
+        f.write(render(d))
+    return path
+
+
 def list_due(vault_dir: Path, window_days: int = 30, today: date | None = None) -> list[dict]:
     """Open deadlines due between today and today + window_days, soonest first."""
     today = today or date.today()
