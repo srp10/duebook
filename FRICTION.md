@@ -46,6 +46,24 @@ Format: task attempted · steps · expected vs actual · severity · workaround 
 - **Workaround:** Put the `mcp-remote` npm package (stdio↔Streamable HTTP proxy) in the Desktop config: `npx -y mcp-remote@0.14.3 http://127.0.0.1:8000/mcp`. The server itself stays pure Streamable HTTP. This adds a Node.js requirement on the client side, and there's one more process that can fail.
 - **Suggestion:** Either let `claude_desktop_config.json` accept `{"type": "http", "url": ...}` for local servers, or say plainly in the local-servers guide that HTTP needs a bridge and link to the recommended one.
 
+## 5. Claude Desktop overwrote `claude_desktop_config.json` edits made while it was running
+
+- **Task attempted:** Add the `duebook` entry under `mcpServers` via Settings → Developer → Edit Config, then restart.
+- **Steps:** Edited and saved the file with Claude Desktop open, quit with ⌘Q, reopened. No duebook connector. Checked the file: `mcpServers` was gone. Only `coworkUserFilesPath` and `preferences` remained, and the file's modified time matched the app restart.
+- **Expected vs actual:** Expected the "Edit Config" button to be a safe way to edit while the app is open. Actually, the app rewrote the file from its in-memory settings, silently dropping the new key. No warning, and no log line mentioning duebook.
+- **Severity:** Medium. The server looks broken when it isn't, and nothing points at the real cause.
+- **Workaround:** Quit Claude Desktop fully first, edit the file, check it (`python3 -c "import json,os;print(json.load(open(os.path.expanduser('~/Library/Application Support/Claude/claude_desktop_config.json'))).get('mcpServers'))"`), then reopen.
+- **Suggestion:** Merge on write instead of overwriting, or watch the file and reload. At minimum, have "Edit Config" warn that edits need the app closed.
+
+## 6. `npx` from nvm isn't on Claude Desktop's PATH
+
+- **Task attempted:** Launch the `mcp-remote` bridge from `claude_desktop_config.json` with `"command": "npx"`.
+- **Steps:** `which npx` → `~/.nvm/versions/node/v24.13.0/bin/npx`. GUI apps on macOS don't source `~/.zshrc`, so nvm's PATH isn't there.
+- **Expected vs actual:** A bare `npx` in the config would fail to start. A full path to `npx` alone isn't enough either, because the `npx` script starts with `#!/usr/bin/env node` and `node` isn't on the GUI PATH either.
+- **Severity:** Medium. It's common for anyone who installed Node with nvm, and the failure only shows in the logs.
+- **Workaround:** Use the absolute `npx` path *and* set `"env": {"PATH": "<nvm node bin>:/usr/bin:/bin"}` on the server entry. With that, the connector appeared on the first restart after the config stuck.
+- **Suggestion:** The local-servers guide should cover nvm/asdf/volta installs. Or Claude Desktop could resolve commands using the user's login-shell PATH.
+
 ---
 
 ## Time to first tool call
