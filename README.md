@@ -67,29 +67,51 @@ Claude Desktop's config file only starts **stdio** servers, and its Custom Conne
 accept `localhost` URLs. To reach this local Streamable HTTP server, it launches
 [`mcp-remote`](https://www.npmjs.com/package/mcp-remote), a small stdio↔HTTP bridge.
 
-1. Start the server (`uv run duebook`) and leave it running.
-2. Open Claude Desktop → **Settings → Developer → Edit Config**. That opens
-   `~/Library/Application Support/Claude/claude_desktop_config.json`. Add `duebook` under
-   `mcpServers`, keeping any servers already there:
+1. Start the server (`uv run duebook`) and leave it running in its own terminal.
+2. Find where your Node.js is installed:
+
+   ```bash
+   dirname "$(which npx)"
+   ```
+
+   Claude Desktop doesn't inherit your shell's `PATH`, so a bare `npx` often isn't found,
+   especially if Node came from nvm, asdf or volta. The config below uses this directory
+   (`<NODE_BIN>`) for both the `npx` path and a `PATH` that includes `node`, since `npx` is
+   itself a `#!/usr/bin/env node` script.
+3. **Quit Claude Desktop fully (⌘Q).** If you edit the config while the app is running, it
+   can overwrite your changes when it quits.
+4. With the app closed, open the config:
+
+   ```bash
+   open -e ~/Library/Application\ Support/Claude/claude_desktop_config.json
+   ```
+
+   Add an `mcpServers` key next to whatever is already in the file (keep existing keys such
+   as `preferences`), replacing `<NODE_BIN>` with the output of step 2:
 
    ```json
-   {
-     "mcpServers": {
-       "duebook": {
-         "command": "npx",
-         "args": ["-y", "mcp-remote@0.14.3", "http://127.0.0.1:8000/mcp"]
+   "mcpServers": {
+     "duebook": {
+       "command": "<NODE_BIN>/npx",
+       "args": ["-y", "mcp-remote@0.14.3", "http://127.0.0.1:8000/mcp"],
+       "env": {
+         "PATH": "<NODE_BIN>:/usr/bin:/bin"
        }
      }
    }
    ```
 
-   If Claude Desktop can't find `npx` (a GUI app doesn't always inherit your shell's `PATH`),
-   replace `"npx"` with the full path from `which npx`.
-3. Quit Claude Desktop fully (**⌘Q**, not just closing the window) and reopen it.
-4. In a new chat, open the **+** menu → **Connectors**. `duebook` should be listed with its
-   three tools.
+5. Check the edit was saved (this should print the `duebook` entry, not `None`):
 
-If it doesn't connect, check the logs:
+   ```bash
+   python3 -c "import json,os;print(json.load(open(os.path.expanduser('~/Library/Application Support/Claude/claude_desktop_config.json'))).get('mcpServers'))"
+   ```
+
+6. Open Claude Desktop, start a new chat, and open the **+** menu → **Connectors**.
+   `duebook` should be listed with its three tools.
+
+If it doesn't connect, rerun the step 5 check (if it prints `None`, the app overwrote the
+file, so quit it and add the entry again), then check the logs:
 
 ```bash
 tail -n 50 -f ~/Library/Logs/Claude/mcp*.log
