@@ -16,11 +16,11 @@ An MCP server that owns a household's hard deadlines (visa, school, lease, insur
 One file per deadline: `vault/<slug>.md`
 ```yaml
 ---
-title: Visa renewal — Srikanth
+title: Visa renewal — Parent A
 due: 2026-11-15
 window_start: 2026-11-10        # optional; for deadlines with a window
 kind: hard | soft
-source: "HK Immigration letter, 2026-08-30"   # where the date came from
+source: "Immigration department letter, 2026-08-30"   # where the date came from
 confidence: 0.95                # 0–1; how sure we are of the date
 status: open | done | cancelled
 ---
