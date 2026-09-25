@@ -71,4 +71,4 @@ Format: task attempted · steps · expected vs actual · severity · workaround 
 | Client | Measured from | Time | Notes |
 |---|---|---|---|
 | MCP Python SDK client (`streamablehttp_client`) | `git init` (23:44:22) → first successful `list_due` (≈23:48:24) | **≈4 min** | Excludes toolchain install (FRICTION #2) and SDK version research (#1). |
-| Claude Desktop (via `mcp-remote`) | _config edit → first tool call in chat_ | _TBD: Srikanth to record during the two-session test_ | |
+| Claude Desktop (via `mcp-remote`) | first config save (≈20:39) → `add_deadline` wrote the vault file (20:49:22, file mtime) | **≈10 min** | Most of it lost to the app overwriting the config (#5) and the nvm PATH fix (#6). Server was already running. |
