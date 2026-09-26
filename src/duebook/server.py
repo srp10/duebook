@@ -49,8 +49,9 @@ def add_deadline(title: str, due: str, kind: str, source: str, confidence: float
 def find_conflicts(window_days: int = 7) -> list[dict]:
     """Find pairs of open deadlines due within `window_days` of each other.
 
-    Each result has the two deadlines (a, b), days_apart, and a one-sentence
-    plain-English explanation of the clash. Hard deadlines are listed first.
+    Each result has the two deadlines (a, b), days_apart, and a one- or two-sentence
+    plain-English explanation of the clash and what to do about it. Hard deadlines
+    are listed first.
     """
     return vault.find_conflicts(VAULT_DIR, window_days)
 

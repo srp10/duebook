@@ -148,14 +148,43 @@ def find_conflicts(vault_dir: Path, window_days: int = 7) -> list[dict]:
                     "a": first.summary(),
                     "b": second.summary(),
                     "days_apart": gap,
-                    "explanation": f"{_label(first)} collides with {_label(second)}, {_gap(gap)}.",
+                    "explanation": f"{_label(first)} collides with {_label(second)}, "
+                    f"{_gap(gap)}. {_why(first, second, gap)}",
                 }
             )
     return conflicts
 
 
+def _why(first: Deadline, second: Deadline, gap: int) -> str:
+    """Second sentence of a conflict explanation: why the clash matters and what to do.
+
+    `first` is the hard one in a hard/soft pair, otherwise the earlier one.
+    """
+    if first.kind == "hard" and second.kind == "soft":
+        if first.window_start:
+            return (
+                f"{first.title} can't move but can be done from {_day(first.window_start)}, "
+                f"so do it early or shift {second.title}."
+            )
+        return f"{first.title} can't move, so shift {second.title}."
+    if first.kind == "hard":
+        start = "both" if gap == 0 else first.title
+        windows = [
+            f"{d.title} can be done from {_day(d.window_start)}"
+            for d in (first, second)
+            if d.window_start
+        ]
+        note = f" ({'; '.join(windows)})" if windows else ""
+        return f"Both are immovable, so start {start} now{note}."
+    return "Both are flexible, so spread them out."
+
+
 def _label(d: Deadline) -> str:
-    return f"{d.title} ({d.kind}, {d.due.day} {d.due:%b})"
+    return f"{d.title} ({d.kind}, {_day(d.due)})"
+
+
+def _day(d: date) -> str:
+    return f"{d.day} {d:%b}"
 
 
 def _gap(n: int) -> str:
