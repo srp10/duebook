@@ -1,0 +1,21 @@
+From: Bursar <bursar@oakridge-primary.example>
+To: Parents of Year 3 <year3-parents@oakridge-primary.example>
+Date: Mon, 21 Sep 2026 09:12:00 +0000
+Subject: Term 2 tuition fees - payment due 30 October
+
+Dear Parents and Guardians,
+
+Invoices for Term 2 tuition have now been issued through the parent portal.
+
+Term 2 fees of 18,500 are due by 30 October 2026.
+
+Families who pay in full by 16 October 2026 will receive a 2% early-payment
+discount, applied automatically.
+
+Payments received after 30 October 2026 incur a 200 administration fee. If you
+need a payment plan, please contact the bursary before the due date.
+
+Kind regards,
+
+Jordan Sample
+Bursar, Oakridge Primary School
