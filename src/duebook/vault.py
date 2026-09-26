@@ -119,12 +119,18 @@ def add_deadline(
 
 
 def list_due(vault_dir: Path, window_days: int = 30, today: date | None = None) -> list[dict]:
-    """Open deadlines due between today and today + window_days, soonest first."""
-    # TODO(week 2): return overdue open items first, flagged as overdue.
+    """Overdue open deadlines first (most overdue first, flagged), then open deadlines
+    due between today and today + window_days, soonest first."""
     today = today or date.today()
     end = today + timedelta(days=window_days)
-    due = [d for d in read_all(vault_dir) if d.status == "open" and today <= d.due <= end]
-    return [d.summary() for d in sorted(due, key=lambda d: d.due)]
+    open_ = sorted((d for d in read_all(vault_dir) if d.status == "open"), key=lambda d: d.due)
+    overdue = [
+        d.summary() | {"overdue": True, "days_overdue": (today - d.due).days}
+        for d in open_
+        if d.due < today
+    ]
+    upcoming = [d.summary() for d in open_ if today <= d.due <= end]
+    return overdue + upcoming
 
 
 def find_conflicts(vault_dir: Path, window_days: int = 7) -> list[dict]:

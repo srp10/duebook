@@ -29,12 +29,36 @@ def test_returns_only_open_within_window_sorted(vault_dir):
     write(vault_dir, "later", title="Later", due=date(2026, 10, 20))
     write(vault_dir, "sooner", title="Sooner", due=date(2026, 10, 3))
     write(vault_dir, "outside", title="Outside", due=date(2026, 11, 30))
-    write(vault_dir, "past", title="Past", due=date(2026, 9, 30))
     write(vault_dir, "done", title="Done", due=date(2026, 10, 5), status="done")
 
     result = list_due(vault_dir, window_days=30, today=TODAY)
 
     assert [r["title"] for r in result] == ["Sooner", "Later"]
+
+
+def test_overdue_open_items_come_first_most_overdue_first(vault_dir):
+    write(vault_dir, "upcoming", title="Upcoming", due=date(2026, 10, 3))
+    write(vault_dir, "yesterday", title="Yesterday", due=date(2026, 9, 30))
+    write(vault_dir, "long-ago", title="Long ago", due=date(2026, 8, 1))
+    write(vault_dir, "old-done", title="Old done", due=date(2026, 9, 1), status="done")
+
+    result = list_due(vault_dir, window_days=30, today=TODAY)
+
+    assert [(r["title"], r.get("days_overdue")) for r in result] == [
+        ("Long ago", 61),
+        ("Yesterday", 1),
+        ("Upcoming", None),
+    ]
+    assert result[0]["overdue"] is True
+    assert "overdue" not in result[2]
+
+
+def test_overdue_items_ignore_the_window(vault_dir):
+    write(vault_dir, "ancient", title="Ancient", due=date(2025, 1, 1))
+
+    [r] = list_due(vault_dir, window_days=0, today=TODAY)
+    assert r["overdue"] is True
+    assert r["days_overdue"] == (TODAY - date(2025, 1, 1)).days
 
 
 def test_window_edges_are_inclusive(vault_dir):

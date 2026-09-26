@@ -19,10 +19,12 @@ mcp = FastMCP(
 
 @mcp.tool()
 def list_due(window_days: int = 30) -> list[dict]:
-    """List open household deadlines due in the next `window_days` days, soonest first.
+    """List open household deadlines: overdue ones first, then those due in the next
+    `window_days` days, soonest first.
 
     Each result has title, due (ISO date), kind (hard/soft), source (where the date
-    came from) and confidence (0-1).
+    came from) and confidence (0-1). Overdue items also have overdue: true and
+    days_overdue; mention them to the user before anything else.
     """
     return vault.list_due(VAULT_DIR, window_days)
 
