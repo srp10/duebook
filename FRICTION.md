@@ -64,6 +64,15 @@ Format: task attempted · steps · expected vs actual · severity · workaround 
 - **Workaround:** Use the absolute `npx` path *and* set `"env": {"PATH": "<nvm node bin>:/usr/bin:/bin"}` on the server entry. With that, the connector appeared on the first restart after the config stuck.
 - **Suggestion:** The local-servers guide should cover nvm/asdf/volta installs. Or Claude Desktop could resolve commands using the user's login-shell PATH.
 
+## 7. pdfplumber wraps pdfminer errors in its own exception type
+
+- **Task attempted:** Turn a corrupt PDF into a clear "not a readable PDF" error in the text loader.
+- **Steps:** Caught `pdfminer.pdfparser.PDFSyntaxError` around `pdfplumber.open(...)`, then fed it `%PDF-1.4` followed by junk.
+- **Expected vs actual:** Expected pdfminer's own syntax error, since pdfplumber is a layer over pdfminer. Actually got `pdfplumber.utils.exceptions.PdfminerException: No /Root object! - Is this really a PDF?`, which pdfplumber raises for *any* pdfminer failure. It isn't exported at the top level of `pdfplumber`, and the README doesn't mention it.
+- **Severity:** Low (a test caught it), but in production the raw traceback would have reached the MCP client.
+- **Workaround:** `from pdfplumber.utils.exceptions import PdfminerException` and catch that.
+- **Suggestion:** Export the exception from `pdfplumber` and document it on `pdfplumber.open`.
+
 ---
 
 ## Time to first tool call
