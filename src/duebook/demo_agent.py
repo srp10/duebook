@@ -70,6 +70,19 @@ class TurnBudget:
         self.trace.append({"tool": name, "status": "called"})
 
     def after_tool(self, event):
+        # Separate saved user inputs from model-generated classification prose before
+        # returning evidence to the conversational model. Never alter the vault record.
+        if event.result.get("status") == "success":
+            for block in event.result.get("content", []):
+                if "text" in block:
+                    try:
+                        block["text"] = json.dumps(agent_evidence(json.loads(block["text"])))
+                    except (ValueError, TypeError):
+                        pass
+            if "structuredContent" in event.result:
+                event.result["structuredContent"] = agent_evidence(
+                    event.result["structuredContent"]
+                )
         self.trace.append({"tool": event.tool_use["name"], "status": event.result["status"]})
 
 
@@ -82,6 +95,28 @@ def decode_result(result: dict):
         # This is the MCP server's serialized result, not free-form model prose.
         value = json.loads(next(b["text"] for b in result["content"] if "text" in b))
     return value.get("result", value) if isinstance(value, dict) else value
+
+
+def agent_evidence(value):
+    """Expose explicit provenance without contradictory generated classification prose."""
+    if isinstance(value, list):
+        return [agent_evidence(item) for item in value]
+    if not isinstance(value, dict):
+        return value
+    result = {key: agent_evidence(item) for key, item in value.items()}
+    notes = result.get("notes", "")
+    if isinstance(notes, str) and "User clarification:" in notes:
+        lines = notes.splitlines()
+        result["user_supplied_clarification"] = next(
+            line.partition("User clarification:")[2].strip()
+            for line in lines
+            if "User clarification:" in line
+        )
+        result["clarification_origin"] = "User input, NOT evidence from the document"
+        result["notes"] = "\n\n".join(
+            part for part in notes.split("\n\n") if not part.strip().startswith("Classification:")
+        )
+    return result
 
 
 def public_answer(text: str) -> str:

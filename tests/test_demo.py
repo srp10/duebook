@@ -214,3 +214,21 @@ def test_thinking_only_response_is_not_an_answer():
 
     with pytest.raises(DemoError, match="did not return an answer"):
         public_answer("<thinking>No final answer</thinking>")
+
+
+def test_agent_evidence_separates_supplied_date_from_generated_classification():
+    from duebook.demo_agent import agent_evidence
+
+    original = {
+        "notes": "Classification: document provides date 2026-10-01.\n\n"
+        "Calculated as receipt 2026-10-01 + 30 calendar days.\n"
+        "User clarification: 2026-10-01",
+        "source": "within 30 days of receipt",
+    }
+    result = agent_evidence({"result": [original]})["result"][0]
+    assert result["user_supplied_clarification"] == "2026-10-01"
+    assert result["clarification_origin"] == "User input, NOT evidence from the document"
+    assert "Classification:" not in result["notes"]
+    assert "Calculated as receipt" in result["notes"]
+    assert "Classification:" in original["notes"]
+    assert result["source"] == original["source"]
