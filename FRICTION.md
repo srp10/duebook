@@ -150,3 +150,21 @@ Format: task attempted · steps · expected vs actual · severity · workaround 
   test covers a model-proposed 60-day clash gap. Core MCP tool semantics stay unchanged.
 - **Suggestion:** Give semantically different horizons different parameter names in future
   tool versions; schema-valid arguments alone do not establish useful intent.
+
+
+## 15. Prompting did not reliably preserve receipt-date provenance
+
+- **Task attempted:** Explain the saved insurance deadline in a new conversation.
+- **Expected vs actual:** The vault recorded user clarification 2026-10-01 and a 30-day
+  calculation. Despite prompt and tool-evidence cleanup, the user got an invented
+  2026-09-30 date attributed to the document. One successful live answer was insufficient.
+- **Severity:** High: a correct stored deadline received a false explanation.
+- **Fix:** Recognized source/receipt/calculation questions now read MCP directly and
+  render the saved due date, labelled user clarification, recorded calculation and source
+  verbatim. No model is invoked for this path; missing context prompts a title selection,
+  and missing evidence is stated instead of inferred. Cards also omit contradictory
+  generated classification prose when an explicit user clarification exists.
+- **Limit:** This deterministic route uses an English intent matcher; other conversational
+  responses remain model-generated. Broader grounded-answer coverage is still follow-up work.
+- **Validation:** Regressions include the reported false date, misleading classification,
+  contaminated chat history, changed record values, missing evidence and MCP failures.

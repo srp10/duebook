@@ -232,3 +232,102 @@ def test_agent_evidence_separates_supplied_date_from_generated_classification():
     assert "Calculated as receipt" in result["notes"]
     assert "Classification:" in original["notes"]
     assert result["source"] == original["source"]
+
+
+@pytest.fixture
+def provenance_records():
+    return [
+        {
+            "title": "Home Contents Cover Renewal",
+            "due": "2026-10-31",
+            "source": "Please renew within 30 days of receipt of this notice.",
+            "notes": "Classification: document gives 2026-09-30.\n\n"
+            "Calculated as receipt 2026-10-01 + 30 calendar days.\n"
+            "User clarification: 2026-10-01",
+        }
+    ]
+
+
+@pytest.mark.parametrize(
+    "question",
+    [
+        "How was the Home Contents Cover Renewal deadline calculated? "
+        "Where did the receipt date come from?",
+        "Home Contents Cover Renewal: was 2026-09-30 from document evidence?",
+        "What is the source for Home Contents Cover Renewal?",
+    ],
+)
+def test_provenance_reads_live_record_without_invoking_model(
+    monkeypatch, provenance_records, question
+):
+    from contextlib import nullcontext
+
+    from duebook.demo_agent import StrandsBridge
+
+    bridge = StrandsBridge("unused")
+    calls = []
+    monkeypatch.setattr(bridge, "connect", lambda: nullcontext("client"))
+
+    def call(client, name, args):
+        calls.append((name, args))
+        return provenance_records
+
+    monkeypatch.setattr(bridge, "_call", call)
+    result = bridge.answer(
+        [{"role": "assistant", "text": "Receipt was 2026-09-30 from evidence."}], question
+    )
+    assert calls == [("list_due", {"window_days": 365})]
+    assert result["model_calls"] == 0
+    assert "2026-10-01" in result["text"]
+    assert "2026-10-31" in result["text"]
+    assert "2026-09-30" not in result["text"]
+    assert "User-supplied clarification" in result["text"]
+    assert provenance_records[0]["source"] in result["text"]
+
+
+def test_provenance_missing_input_is_not_back_calculated(provenance_records):
+    from duebook.demo_agent import provenance_answer
+
+    provenance_records[0]["notes"] = "Classification: receipt date was in the document."
+    text = provenance_answer(provenance_records, [], "Home Contents Cover Renewal source?")
+    assert "No user-supplied clarification" in text
+    assert "No calculation" in text
+    assert "2026-10-01" not in text
+
+
+def test_provenance_uses_current_values_and_user_context(provenance_records):
+    from duebook.demo_agent import provenance_answer
+
+    row = provenance_records[0]
+    row.update(
+        title="Annual Permit",
+        due="2027-02-22",
+        notes="User clarification: 2027-02-01\n"
+        "Calculated as receipt 2027-02-01 + 21 calendar days.",
+    )
+    text = provenance_answer(
+        provenance_records,
+        [{"role": "user", "text": "Tell me about Annual Permit"}],
+        "Where did that date come from?",
+    )
+    assert "2027-02-01" in text and "2027-02-22" in text
+    assert "2026-10-01" not in text
+    assert "Which saved deadline" in provenance_answer(
+        provenance_records, [], "Where did that date come from?"
+    )
+
+
+def test_provenance_tool_failure_never_falls_back_to_model(monkeypatch):
+    from contextlib import nullcontext
+
+    from duebook.demo_agent import StrandsBridge
+
+    bridge = StrandsBridge("unused")
+    monkeypatch.setattr(bridge, "connect", lambda: nullcontext())
+
+    def fail(*args):
+        raise DemoError("MCP unavailable")
+
+    monkeypatch.setattr(bridge, "_call", fail)
+    with pytest.raises(DemoError, match="MCP unavailable"):
+        bridge.answer([], "Where did the receipt date come from?")

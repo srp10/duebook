@@ -288,3 +288,12 @@ The [rules](https://amazonappdev2026.devpost.com/rules) and
 allow a custom text-based simulated experience. The AWS mini-challenge accepts documented
 Bedrock/Strands use; AgentCore is not required. MIT licensing this repository alone does
 not meet the separate open-source mini-challenge contribution requirement.
+
+
+Date-provenance safeguard: English questions mentioning receipt, calculation, source,
+evidence or where a date came from use a fresh MCP read and a deterministic rendering of
+stored fields, with zero model calls. Name the deadline (or refer to a title in your earlier
+question). If no title matches, the demo asks you to choose one. It does not reverse-calculate
+missing receipt dates or treat prior chat as evidence. The view covers open records through
+365 days; records outside that view are not asserted absent from the vault. This safeguard
+is intent-based; general chat remains model-generated and needs review against the cards.

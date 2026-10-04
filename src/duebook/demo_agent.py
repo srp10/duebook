@@ -119,6 +119,58 @@ def agent_evidence(value):
     return result
 
 
+PROVENANCE_QUESTION = re.compile(
+    r"receipt|receiv|calculat|clarification|user.supplied|evidence|source|provenance|"
+    r"where.*(?:date|deadline)|how.*(?:date|deadline)|(?:date|deadline).*come from",
+    re.IGNORECASE,
+)
+
+
+def provenance_answer(records: list[dict], history: list[dict], message: str) -> str:
+    """Render stored evidence, never an LLM's explanation or an inferred receipt date."""
+
+    def mentioned(text):
+        return [row for row in records if row["title"].casefold() in text.casefold()]
+
+    selected = mentioned(message)
+    if not selected:
+        for turn in reversed(history):
+            if turn["role"] == "user":
+                selected = mentioned(turn["text"])
+                if selected:
+                    break
+    if not selected:
+        titles = "; ".join(row["title"] for row in records)
+        return (
+            "Which saved deadline do you mean? Choose a title: " + titles
+            if titles
+            else "No open deadlines were returned in the next 365 days. "
+            "I cannot verify a date or its source from this view."
+        )
+    parts = ["From the saved demo record (without model paraphrasing):"]
+    for row in selected:
+        parts.append(f"{row['title']} — saved due date: {row['due']}.")
+        notes = row.get("notes", "")
+        clarifications = re.findall(r"^User clarification: (.+)$", notes, re.MULTILINE)
+        calculations = re.findall(r"^Calculated as (.+)$", notes, re.MULTILINE)
+        if clarifications:
+            parts.append(
+                "User-supplied clarification (not independently verified): "
+                + " | ".join(clarifications)
+            )
+        else:
+            parts.append(
+                "No user-supplied clarification is recorded. "
+                "I cannot infer a receipt date from the due date."
+            )
+        if calculations:
+            parts.append("Recorded calculation: " + " | ".join(calculations))
+        else:
+            parts.append("No calculation is recorded.")
+        parts.append("Saved source quote/reference: “" + row["source"] + "”")
+    return "\n\n".join(parts)
+
+
 def public_answer(text: str) -> str:
     """Nova may include an internal thinking tag in otherwise plain final text."""
     text = re.sub(r"<thinking>.*?(?:</thinking>|$)", "", text, flags=re.DOTALL | re.IGNORECASE)
@@ -156,13 +208,23 @@ class StrandsBridge:
         conflicts = [
             c for c in conflicts if all((c[k]["title"], c[k]["due"]) in visible for k in ("a", "b"))
         ]
-        return {"deadlines": deadlines, "conflicts": conflicts}
+        return agent_evidence({"deadlines": deadlines, "conflicts": conflicts})
 
     def ingest(self, path: str, hint: str | None = None) -> dict:
         with self.connect() as client:
             return self._call(client, "ingest_document", {"path_or_text": path, "hint": hint})
 
     def answer(self, history: list[dict], message: str) -> dict:
+        if PROVENANCE_QUESTION.search(message):
+            # A fresh MCP read is required even if chat history contains a plausible answer.
+            # Tool failures propagate: never fall back to model guesses or stale chat text.
+            with self.connect() as client:
+                records = self._call(client, "list_due", {"window_days": 365})
+            return {
+                "text": provenance_answer(records, history, message),
+                "trace": [{"tool": "list_due", "status": "success"}],
+                "model_calls": 0,
+            }
         import boto3
         from botocore.config import Config
         from strands import Agent
