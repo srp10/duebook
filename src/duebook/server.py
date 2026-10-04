@@ -5,7 +5,7 @@ from pathlib import Path
 
 from mcp.server.fastmcp import FastMCP
 
-from duebook import vault
+from duebook import ingest, vault
 
 # Default to the repo's vault/ so the server finds it regardless of cwd.
 VAULT_DIR = Path(os.environ.get("DUEBOOK_VAULT", Path(__file__).resolve().parents[2] / "vault"))
@@ -54,6 +54,18 @@ def find_conflicts(window_days: int = 7) -> list[dict]:
     are listed first.
     """
     return vault.find_conflicts(VAULT_DIR, window_days)
+
+
+@mcp.tool()
+def ingest_document(path_or_text: str, hint: str | None = None) -> dict:
+    """Extract one deadline from PDF/txt/eml path or pasted text using Amazon Bedrock.
+
+    Sends document text to AWS. A clear, validated deadline is saved with a source quote.
+    On needs_confirmation, ask the returned question and call again with the SAME
+    document and the user's answer in hint. Never guess an answer for the user.
+    Scans are unsupported. Duplicates are refused; uncertain results never write files.
+    """
+    return ingest.ingest_document(VAULT_DIR, path_or_text, hint)
 
 
 def main() -> None:

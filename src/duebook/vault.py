@@ -89,6 +89,9 @@ def add_deadline(
     kind: str,
     source: str,
     confidence: float = 0.8,
+    *,
+    window_start: str | None = None,
+    notes: str = "",
 ) -> Path:
     """Write a new open deadline to the vault. Refuses a duplicate title + due."""
     title = title.strip()
@@ -103,6 +106,10 @@ def add_deadline(
     if not 0 <= confidence <= 1:
         raise ValueError(f"confidence must be between 0 and 1, got {confidence}")
 
+    start_date = date.fromisoformat(window_start) if window_start else None
+    if start_date and start_date > due_date:
+        raise ValueError("window_start must not be after due")
+
     slug = slugify(title, due_date)
     for existing in read_all(vault_dir):
         if slugify(existing.title, existing.due) == slug:
@@ -112,7 +119,15 @@ def add_deadline(
             )
 
     path = vault_dir / f"{slug}.md"
-    d = Deadline(title=title, due=due_date, kind=kind, source=source, confidence=confidence)
+    d = Deadline(
+        title=title,
+        due=due_date,
+        kind=kind,
+        source=source,
+        confidence=confidence,
+        window_start=start_date,
+        notes=notes,
+    )
     with path.open("x", encoding="utf-8") as f:  # "x" never overwrites an existing file
         f.write(render(d))
     return path
