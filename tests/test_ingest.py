@@ -211,7 +211,7 @@ def test_confident_invented_receipt_date_is_blocked(vault_dir):
 
 
 @pytest.mark.parametrize(
-    "hint", [None, "2026-10-01", "Received on 2026-02-30", "Received 2026-10-01 or 2026-10-02"]
+    "hint", [None, "2026-02-30", "Received on 2026-02-30", "Received 2026-10-01 or 2026-10-02"]
 )
 def test_receipt_anchor_must_be_explicit_and_unambiguous(vault_dir, hint):
     result = ingest_document(
@@ -242,5 +242,34 @@ def test_absent_year_requires_confirmation(vault_dir):
     fields["source"] = "School fees are due 30 October."
     fields["due"] = "2026-10-30"
     result = ingest_document(vault_dir, fields["source"], extractor=BedrockExtractor(client))
+    assert result["status"] == "needs_confirmation"
+    assert not list(vault_dir.iterdir())
+
+
+@pytest.mark.parametrize("hint", ["2026-10-01", " 2026-10-01 "])
+def test_bare_date_resolves_receipt_question(vault_dir, hint):
+    client = ReplayClient("confirmed")
+    result = ingest_document(
+        vault_dir,
+        str(FIXTURES / "insurance-renewal-ambiguous.pdf"),
+        hint,
+        extractor=BedrockExtractor(client),
+    )
+    assert result["status"] == "saved"
+    assert read_all(vault_dir)[0].due == date(2026, 10, 31)
+    payload = json.loads(client.requests[0]["messages"][0]["content"][0]["text"])
+    assert payload["user_hint"] == "Receipt date: 2026-10-01"
+
+
+def test_bare_date_does_not_resolve_unrelated_ambiguity(vault_dir):
+    client = ReplayClient("confirmed")
+    fields = client.response["output"]["message"]["content"][0]["toolUse"]["input"]
+    fields.update(ambiguities=["Two conflicting policies"], question="Which policy applies?")
+    result = ingest_document(
+        vault_dir,
+        str(FIXTURES / "insurance-renewal-ambiguous.pdf"),
+        "2026-10-01",
+        extractor=BedrockExtractor(client),
+    )
     assert result["status"] == "needs_confirmation"
     assert not list(vault_dir.iterdir())

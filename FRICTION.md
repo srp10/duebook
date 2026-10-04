@@ -117,3 +117,12 @@ Format: task attempted · steps · expected vs actual · severity · workaround 
 - **Severity:** High: an invented date could silently become a saved obligation.
 - **Workaround:** Deterministically require an explicit receipt-date hint for the supported 'within N days of receipt' pattern and calculate the interval in Python. Missing due-year evidence requires confirmation. Only retain opening windows with explicit supporting language; preserve discount/payment-plan paragraphs as context. Replay the actual responses in offline tests. Other date phrasing still depends on model interpretation; this is not a general date-proof system.
 - **Suggestion:** Evaluate missing-anchor cases as a first-class extraction benchmark; never equate model confidence with factual grounding.
+
+## 12. Bare receipt-date answers were rejected by the clarification guard
+
+- **Task attempted:** Complete the insurance clarification flow through OpenWork (2026-10-04).
+- **Steps:** Tool asked for a receipt date in YYYY-MM-DD; client passed `2026-10-01` as hint.
+- **Expected vs actual:** Expected a saved Oct 31 deadline. The guard required the literal word 'received' or 'receipt', so it repeated the question despite a valid answer.
+- **Severity:** High: normal client replies could not complete the flow.
+- **Workaround / fix:** In a document with the supported receipt-relative deadline, accept a standalone valid ISO date as the receipt-date answer and label it as such before calling Bedrock. Multiple dates, invalid dates, and unrelated ambiguities still prevent writes. Added regression tests for bare dates and whitespace.
+- **Suggestion:** Test natural client follow-up arguments, not only fully phrased developer hints.

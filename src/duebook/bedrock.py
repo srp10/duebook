@@ -111,7 +111,8 @@ def ground_date(candidate: dict, document: str, hint: str | None) -> dict:
         anchors = re.findall(r"\b\d{4}-\d{2}-\d{2}\b", hint or "")
         received = re.search(r"\b(received|receipt)\b", hint or "", re.I)
         anchor = None
-        if len(anchors) == 1 and received:
+        bare_date = re.fullmatch(r"\d{4}-\d{2}-\d{2}", (hint or "").strip())
+        if len(anchors) == 1 and (received or bare_date):
             try:
                 anchor = date.fromisoformat(anchors[0])
             except ValueError:
@@ -188,6 +189,16 @@ class BedrockExtractor:
         self.model_id = model_id or os.environ.get("DUEBOOK_MODEL_ID", MODEL)
 
     def extract(self, document: str, hint: str | None = None) -> dict:
+        # A bare ISO date answers the receipt-date question in this document context.
+        # Expand it before extraction too, so the model sees the same resolved meaning.
+        if (
+            isinstance(hint, str)
+            and re.fullmatch(r"\d{4}-\d{2}-\d{2}", hint.strip())
+            and re.search(
+                r"within (\d+) (?:calendar )?days of (?:the )?receipt", normalize(document), re.I
+            )
+        ):
+            hint = f"Receipt date: {hint.strip()}"
         text, truncated = bounded_input(document, hint)
         try:
             if self.client is None:
