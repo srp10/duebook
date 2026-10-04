@@ -14,7 +14,6 @@ markdown vault. Built for the Amazon Developer Hackathon 2026, Alexa+ track.
 | `list_due(window_days=30)` | Overdue open deadlines first, then the next N days; includes source and confidence. |
 | `add_deadline(title, due, kind, source, confidence=0.8)` | Writes `vault/<title-slug>-<due>.md`, returns its path. Refuses a duplicate title + due. `due` is `YYYY-MM-DD`; `kind` is `hard` or `soft`. |
 | `find_conflicts(window_days=7)` | Pairs of open deadlines due within N days of each other, each explaining why the clash matters. |
-
 | `ingest_document(path_or_text, hint=None)` | Extract a document deadline through Bedrock; save or ask for clarification. |
 
 ## Prerequisites
@@ -220,3 +219,72 @@ prove that an alternative deadline has been approved.
 and preserve date calculations. A confidence score does not independently verify the
 receipt date or other user-supplied facts. Clients should show this provenance when
 explaining calculated dates. Existing records are returned without rewriting them.
+
+## Local Alexa+ simulation (Week 3)
+
+A text-based web experience with real Strands/Bedrock responses and real MCP tool calls.
+It is clearly labelled as a simulation; it has no connection to Alexa's backend.
+
+```bash
+uv sync --extra demo
+# Refresh only when your AWS session has expired:
+/usr/local/bin/aws login --profile duebook
+export AWS_PROFILE=duebook
+export AWS_REGION=ap-southeast-1
+uv run --extra demo duebook-demo
+```
+
+Open **http://127.0.0.1:8080**. The launcher starts its own local MCP subprocess on an
+available port, so an existing OpenWork server on port 8000 can keep running. Ctrl+C
+stops the demo and its child server. Use `--port 8081` if 8080 is occupied.
+
+### Try the demo
+
+1. Ask **What's due soon?** Strands calls `list_due` and `find_conflicts` through MCP;
+   **Checks performed** shows the actual calls. The cards use a 60-day horizon and a
+   seven-day gap to flag clashes. Chat also fixes the clash gap to seven days.
+2. Choose the synthetic **Insurance ?** sample. The notice lacks a receipt date;
+   Duebook asks one question and saves nothing.
+3. Enter **2026-10-01** in the clarification control (a made-up test input), then confirm.
+   The resulting deadline is **2026-10-31**. Expand **Source & calculation** to see the
+   exact quote, user clarification and date calculation separately.
+4. Choose **New conversation**, then ask what Duebook remembers. Saved deadlines are
+   read afresh from files; the prior conversation is not sent to the model.
+
+The optional `demo` extra installs Strands Agents. Chat uses APAC Nova Lite by default;
+`DUEBOOK_AGENT_MODEL_ID` overrides only the conversation model. Extraction still uses
+`DUEBOOK_MODEL_ID`. The agent receives only the two read tools; upload and clarification
+controls call `ingest_document` directly, so chat cannot invent a receipt-date answer
+and save it. The question text and documents still require human judgment.
+
+```text
+Browser → local demo service → Strands Agent → Amazon Bedrock (Nova Lite)
+                                ↓ tool calls
+                         Streamable HTTP MCP → markdown vault
+Browser upload/clarification → MCP ingest_document → Bedrock → validate → vault
+```
+
+### Data, limits and scope
+
+- `.duebook-demo/vault/` is a separate persistent synthetic vault, seeded once with five
+  examples dated October–December 2026. The normal `vault/` is not changed. For a fresh
+  run use `--data-dir /tmp/duebook-demo-fresh`; choose a new directory each time.
+- Conversation history and pending uploads last only for this process; saved deadlines
+  survive restarts. Uploads are temporary and removed after saving/cancelling or shutdown.
+  A new conversation leaves the previous one in memory until shutdown (maximum 50).
+- PDF/TXT/EML uploads are limited to 2 MiB. Extracted text goes to Bedrock in APAC.
+  Use synthetic files. Credentials remain in the standard local AWS chain.
+- Each chat turn is limited to five model calls, 500 output tokens per call, twelve prior
+  messages, and a 2,000-character question. HTTP retries are capped at two attempts.
+  Ingestion has the separate limits above. These are bounds, not a dollar spending cap.
+- Loopback only, same-origin request checks, no external frontend assets, and no HTML
+  rendering of model/document text. This is a single-user local demo, not an authenticated
+  public service. Do not expose it through a tunnel.
+- No voice, Alexa backend, AgentCore deployment, scheduled reminders or calendar sync.
+  Open deadlines and future dates are demo facts, not real household obligations.
+
+The [rules](https://amazonappdev2026.devpost.com/rules) and
+[organizer clarification](https://amazonappdev2026.devpost.com/forum_topics/45058-clarification-on-simulated-alexa-web-experience-requirements)
+allow a custom text-based simulated experience. The AWS mini-challenge accepts documented
+Bedrock/Strands use; AgentCore is not required. MIT licensing this repository alone does
+not meet the separate open-source mini-challenge contribution requirement.

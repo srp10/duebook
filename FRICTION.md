@@ -126,3 +126,27 @@ Format: task attempted · steps · expected vs actual · severity · workaround 
 - **Severity:** High: normal client replies could not complete the flow.
 - **Workaround / fix:** In a document with the supported receipt-relative deadline, accept a standalone valid ISO date as the receipt-date answer and label it as such before calling Bedrock. Multiple dates, invalid dates, and unrelated ambiguities still prevent writes. Added regression tests for bare dates and whitespace.
 - **Suggestion:** Test natural client follow-up arguments, not only fully phrased developer hints.
+
+## 13. Strands model configuration accepts a session or region, not both
+
+- **Task attempted:** Use the existing AWS browser-login profile in the simulation agent.
+- **Steps:** Passed a boto3 session and a region_name to BedrockModel (Strands 1.57.2).
+- **Expected vs actual:** Expected the region to select the endpoint; the SDK rejects the
+  two arguments together before inference.
+- **Severity:** Low; caught by the live browser check.
+- **Workaround:** Set the region when constructing the boto3 session and pass only that
+  session to BedrockModel.
+- **Suggestion:** Show the profile-plus-region session example beside the default example.
+
+## 14. The model confused the planning horizon with the clash gap
+
+- **Task attempted:** Ask what is due in the next 60 days and which dates clash.
+- **Steps:** Gave the agent list_due and find_conflicts, both with a window_days parameter.
+- **Expected vs actual:** Expected the one visa/school clash three days apart. Nova passed
+  60 to both tools, yielding ten pairs up to 60 days apart and a long unhelpful answer.
+- **Severity:** Medium; technically valid calls produced misleading planning advice.
+- **Workaround:** The simulation fixes the conflict gap to seven days in a before-tool
+  hook, describes the two meanings explicitly, and asks for a brief synthesis. Regression
+  test covers a model-proposed 60-day clash gap. Core MCP tool semantics stay unchanged.
+- **Suggestion:** Give semantically different horizons different parameter names in future
+  tool versions; schema-valid arguments alone do not establish useful intent.

@@ -129,3 +129,21 @@ Bedrock model access approval flow · region availability of the chosen model ·
 - The school fixture includes a late-payment penalty and an invitation to request a payment plan. Nova classified it as hard based on the penalty; we retain that source-based classification and preserve the payment-plan context, rather than forcing the earlier brief's assumed soft label. An approved flexible payment deadline would need evidence.
 - AWS credentials stay outside the repo. The official CLI is `/usr/local/bin/aws`; Homebrew's CLI remains broken. Use `boto3[crt]` for browser-login credentials.
 - Remain in Week 2 scope: no Alexa+ surface, Strands/AgentCore or reminders implemented here.
+
+## Phase: WEEK 3 — Local simulated experience (authorized Oct 4–5, 2026)
+
+The user authorized proceeding after the successful OpenWork provenance test. This section
+supersedes the earlier no-UI/no-Strands phase restriction for this work.
+
+- Build a clearly labelled local text-based Alexa+ simulation with a real Strands agent,
+  Bedrock Nova Lite and the existing MCP Streamable HTTP tools.
+- The `demo` optional dependency is the agreed Strands SDK addition. Keep base MCP use
+  independent of it. No frontend build chain is needed.
+- Chat has read tools only. Explicit upload/clarification controls own ingestion; preserve
+  the exact user-supplied answer and distinguish it from document evidence.
+- Separate persistent synthetic demo vault; do not alter the user's OpenWork vault.
+- Scope: chat, document upload, clarification, source/calculation cards, conflict display,
+  persistence across new conversations. Bind to loopback, bound model calls and inputs.
+- AgentCore, voice, scheduled reminders, public hosting/auth and calendar sync are separate
+  follow-ups. Do not claim this is connected to Alexa or sends reminders.
+- Validate offline guardrails and one live browser flow, then document observed friction.
