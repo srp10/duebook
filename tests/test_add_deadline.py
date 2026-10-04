@@ -19,6 +19,9 @@ def test_writes_file_readable_by_list_due(vault_dir):
             "kind": "hard",
             "source": "DMV letter",
             "confidence": 0.9,
+            "confidence_note": "Confidence is not independent verification of supplied facts.",
+            "notes": "",
+            "window_start": None,
         }
     ]
 

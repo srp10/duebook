@@ -2,11 +2,20 @@ from datetime import date
 
 from conftest import REPO_VAULT, TODAY, write
 
-from duebook.vault import Deadline, list_due, parse, read_all, render
+from duebook.vault import Deadline, list_due, parse, render
 
 
 def test_seed_vault_parses():
-    deadlines = read_all(REPO_VAULT)
+    deadlines = [
+        parse((REPO_VAULT / name).read_text())
+        for name in [
+            "home-insurance-renewal-2026-10-05.md",
+            "lease-renewal-notice-2026-10-20.md",
+            "school-fee-term-2-2026-11-12.md",
+            "school-trip-consent-form-2026-12-04.md",
+            "visa-renewal-parent-a-2026-11-15.md",
+        ]
+    ]
     assert len(deadlines) == 5
     assert all(d.status == "open" for d in deadlines)
 
@@ -83,5 +92,32 @@ def test_result_fields(vault_dir):
     )
 
     assert list_due(vault_dir, today=TODAY) == [
-        {"title": "A", "due": "2026-10-02", "kind": "soft", "source": "Email", "confidence": 0.7}
+        {
+            "title": "A",
+            "due": "2026-10-02",
+            "kind": "soft",
+            "source": "Email",
+            "confidence": 0.7,
+            "confidence_note": "Confidence is not independent verification of supplied facts.",
+            "notes": "",
+            "window_start": None,
+        }
     ]
+
+
+def test_list_due_returns_saved_clarification_and_calculation(vault_dir):
+    notes = "Calculated as receipt 2026-10-01 + 30 calendar days.\nUser clarification: 2026-10-01"
+    write(
+        vault_dir,
+        "insurance",
+        title="Insurance",
+        due=date(2026, 10, 31),
+        source="Renew within 30 days of receipt.",
+        notes=notes,
+        window_start=date(2026, 10, 1),
+    )
+    [result] = list_due(vault_dir, window_days=60, today=TODAY)
+    assert result["notes"] == notes
+    assert result["source"] == "Renew within 30 days of receipt."
+    assert result["window_start"] == "2026-10-01"
+    assert "not independent verification" in result["confidence_note"]

@@ -34,6 +34,9 @@ class Deadline:
             "kind": self.kind,
             "source": self.source,
             "confidence": self.confidence,
+            "confidence_note": "Confidence is not independent verification of supplied facts.",
+            "notes": self.notes,
+            "window_start": self.window_start.isoformat() if self.window_start else None,
         }
 
 

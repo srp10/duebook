@@ -23,8 +23,11 @@ def list_due(window_days: int = 30) -> list[dict]:
     `window_days` days, soonest first.
 
     Each result has title, due (ISO date), kind (hard/soft), source (where the date
-    came from) and confidence (0-1). Overdue items also have overdue: true and
-    days_overdue; mention them to the user before anything else.
+    came from), confidence (0-1), notes and window_start. Notes preserve user-supplied
+    clarifications and date calculations. When explaining a derived deadline, distinguish
+    the source quote from user-supplied inputs and the calculation; do not imply those
+    inputs were independently verified. Confidence is not verification of supplied facts.
+    Overdue items also have overdue: true and days_overdue; mention them first.
     """
     return vault.list_due(VAULT_DIR, window_days)
 

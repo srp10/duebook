@@ -214,3 +214,9 @@ discount and payment-plan paragraphs are retained as context. These guards cover
 failure cases, not every natural-language date expression. The school fixture's late-payment
 penalty led Nova to classify it as hard; an invitation to request a payment plan does not
 prove that an alternative deadline has been approved.
+
+`list_due` and conflict summaries also return persisted `notes`, `window_start` and a
+`confidence_note`. Notes distinguish user-supplied clarification from the source quote
+and preserve date calculations. A confidence score does not independently verify the
+receipt date or other user-supplied facts. Clients should show this provenance when
+explaining calculated dates. Existing records are returned without rewriting them.
