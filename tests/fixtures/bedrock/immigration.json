@@ -1,0 +1,33 @@
+{
+  "output": {
+    "message": {
+      "role": "assistant",
+      "content": [
+        {
+          "toolUse": {
+            "toolUseId": "tooluse_UAiYMIaIDem5s1XRR8HGmG",
+            "name": "extract_deadline",
+            "input": {
+              "notes": "",
+              "question": "",
+              "due": "2026-11-15",
+              "kind": "hard",
+              "kind_reason": "Applications received after this date cannot be processed before your permit expires.",
+              "confidence": 0.9,
+              "window_start": "2026-11-01",
+              "ambiguities": [],
+              "source": "To remain lawfully resident, your renewal application must be received by this office no later than 15 November 2026.",
+              "title": "Renewal of Residence Permit"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "stopReason": "tool_use",
+  "usage": {
+    "inputTokens": 1091,
+    "outputTokens": 115,
+    "totalTokens": 1206
+  }
+}

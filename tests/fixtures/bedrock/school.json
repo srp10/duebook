@@ -1,0 +1,33 @@
+{
+  "output": {
+    "message": {
+      "role": "assistant",
+      "content": [
+        {
+          "toolUse": {
+            "toolUseId": "tooluse_RgVQZOqw0gpyWxL3ZPq4Ip",
+            "name": "extract_deadline",
+            "input": {
+              "notes": "",
+              "question": "",
+              "due": "2026-10-30",
+              "kind": "hard",
+              "kind_reason": "The document states 'Payments received after 30 October 2026 incur a 200 administration fee', indicating a firm cutoff date.",
+              "confidence": 0.9,
+              "window_start": "2026-09-21",
+              "ambiguities": [],
+              "source": "Term 2 fees of 18,500 are due by 30 October 2026.",
+              "title": "Term 2 tuition fees"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "stopReason": "tool_use",
+  "usage": {
+    "inputTokens": 1127,
+    "outputTokens": 131,
+    "totalTokens": 1258
+  }
+}

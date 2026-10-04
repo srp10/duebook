@@ -1,0 +1,33 @@
+{
+  "output": {
+    "message": {
+      "role": "assistant",
+      "content": [
+        {
+          "toolUse": {
+            "toolUseId": "tooluse_g6jjbPCoXA1uXlx0u7ebQ8",
+            "name": "extract_deadline",
+            "input": {
+              "notes": "",
+              "question": "",
+              "due": "2023-03-20",
+              "kind": "hard",
+              "kind_reason": "The document states 'renew within 30 days of receipt of this notice' and does not mention any flexibility.",
+              "confidence": 0.9,
+              "window_start": "",
+              "ambiguities": [],
+              "source": "To keep your cover without interruption, please renew within 30 days of receipt of this notice.",
+              "title": "Home Contents Cover Renewal"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "stopReason": "tool_use",
+  "usage": {
+    "inputTokens": 1031,
+    "outputTokens": 105,
+    "totalTokens": 1136
+  }
+}
