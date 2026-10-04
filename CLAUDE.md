@@ -119,3 +119,13 @@ Alexa+ Agent Skill or simulated surface · Strands/AgentCore · reminders/escala
 
 Bedrock model access approval flow · region availability of the chosen model · Converse API JSON-schema quirks · pdfplumber on real-world PDFs.
 
+
+## Week 2 implementation update — 2026-10-04
+
+- Selected and live-tested **Amazon Nova Lite**, model `apac.amazon.nova-lite-v1:0`, region `ap-southeast-1`, AWS profile `duebook`.
+- `ingest_document` is the fourth MCP tool. Uses Converse forced tool choice with a JSON schema plus application validation; no prose JSON parsing.
+- All three synthetic documents passed a live temporary-vault run, including the insurance receipt-date round-trip. Offline tests replay these responses; the opt-in pytest live check remains immigration-only.
+- A confident invented date was caught during live testing. Receipt-date arithmetic is now deterministic for the supported pattern; see FRICTION #11 and README limitations.
+- The school fixture includes a late-payment penalty and an invitation to request a payment plan. Nova classified it as hard based on the penalty; we retain that source-based classification and preserve the payment-plan context, rather than forcing the earlier brief's assumed soft label. An approved flexible payment deadline would need evidence.
+- AWS credentials stay outside the repo. The official CLI is `/usr/local/bin/aws`; Homebrew's CLI remains broken. Use `boto3[crt]` for browser-login credentials.
+- Remain in Week 2 scope: no Alexa+ surface, Strands/AgentCore or reminders implemented here.

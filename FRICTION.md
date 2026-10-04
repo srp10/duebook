@@ -81,3 +81,39 @@ Format: task attempted · steps · expected vs actual · severity · workaround 
 |---|---|---|---|
 | MCP Python SDK client (`streamablehttp_client`) | `git init` (23:44:22) → first successful `list_due` (≈23:48:24) | **≈4 min** | Excludes toolchain install (FRICTION #2) and SDK version research (#1). |
 | Claude Desktop (via `mcp-remote`) | first config save (≈20:39) → `add_deadline` wrote the vault file (20:49:22, file mtime) | **≈10 min** | Most of it lost to the app overwriting the config (#5) and the nvm PATH fix (#6). Server was already running. |
+
+## 8. Homebrew AWS CLI had a stale native-library dependency
+
+- **Task attempted:** Run `aws --version` during AWS setup (Oct 3–4, 2026).
+- **Steps:** Installed then reinstalled Homebrew awscli 2.37.8.
+- **Expected vs actual:** `_awscrt` required `libaws-c-s3.1.2.dylib`, but Homebrew had 1.3.0. Reinstallation did not repair it.
+- **Severity:** High: CLI could not start.
+- **Workaround:** Official AWS macOS installer, verified `/usr/local/bin/aws` 2.37.9; use this full path while the Homebrew copy remains broken.
+- **Suggestion:** Check the packaged native dependency linkage in the Homebrew bottle.
+
+## 9. Model catalog visibility did not establish geographic eligibility
+
+- **Task attempted:** Use an OpenAI model in the Bedrock playground from Hong Kong.
+- **Steps:** Selected GPT-6 Luna and attempted a synthetic extraction.
+- **Expected vs actual:** Catalog entry was visible, but invocation rejected the location as unsupported.
+- **Severity:** Medium.
+- **Workaround:** Selected Amazon Nova Lite; verified `apac.amazon.nova-lite-v1:0` in Singapore from the console, CLI and Python.
+- **Suggestion:** Show geographic eligibility restrictions before opening the playground.
+
+## 10. AWS browser sessions expire, and Python needs CRT support
+
+- **Task attempted:** Authenticate from Duebook's Python environment.
+- **Steps:** Added `boto3[crt]>=1.41.0`; invoked STS with profile `duebook`.
+- **Expected vs actual:** First attempt reported an expired refresh token. Reauthentication succeeded.
+- **Severity:** Low.
+- **Workaround:** `/usr/local/bin/aws login --profile duebook`; keep credentials in the standard profile chain.
+- **Suggestion:** Surface a short refresh-login instruction instead of a long credentials traceback.
+
+## 11. Nova confidently invented a date for an unanchored relative deadline
+
+- **Task attempted:** Extract the synthetic insurance notice using a forced schema-shaped tool call.
+- **Steps:** Provided 'within 30 days of receipt' with no receipt date. Also tested the school-fee email.
+- **Expected vs actual:** Nova returned 2023-09-24 with confidence 0.9 and no ambiguity for the insurance notice. It also omitted discount notes and used the school email's issue date as a window start. A JSON schema alone does not establish factual accuracy.
+- **Severity:** High: an invented date could silently become a saved obligation.
+- **Workaround:** Deterministically require an explicit receipt-date hint for the supported 'within N days of receipt' pattern and calculate the interval in Python. Missing due-year evidence requires confirmation. Only retain opening windows with explicit supporting language; preserve discount/payment-plan paragraphs as context. Replay the actual responses in offline tests. Other date phrasing still depends on model interpretation; this is not a general date-proof system.
+- **Suggestion:** Evaluate missing-anchor cases as a first-class extraction benchmark; never equate model confidence with factual grounding.

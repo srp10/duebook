@@ -11,9 +11,11 @@ markdown vault. Built for the Amazon Developer Hackathon 2026, Alexa+ track.
 
 | Tool | What it does |
 |---|---|
-| `list_due(window_days=30)` | Open deadlines due in the next N days, soonest first, with title, due, kind, source, confidence. |
+| `list_due(window_days=30)` | Overdue open deadlines first, then the next N days; includes source and confidence. |
 | `add_deadline(title, due, kind, source, confidence=0.8)` | Writes `vault/<title-slug>-<due>.md`, returns its path. Refuses a duplicate title + due. `due` is `YYYY-MM-DD`; `kind` is `hard` or `soft`. |
-| `find_conflicts(window_days=7)` | Pairs of open deadlines due within N days of each other, each with a one-sentence explanation. |
+| `find_conflicts(window_days=7)` | Pairs of open deadlines due within N days of each other, each explaining why the clash matters. |
+
+| `ingest_document(path_or_text, hint=None)` | Extract a document deadline through Bedrock; save or ask for clarification. |
 
 ## Prerequisites
 
@@ -56,8 +58,8 @@ In the Inspector page that opens:
 
 1. **Transport Type:** `Streamable HTTP`
 2. **URL:** `http://127.0.0.1:8000/mcp`
-3. Click **Connect**, then **Tools → List Tools**. You should see `list_due`, `add_deadline`
-   and `find_conflicts`.
+3. Click **Connect**, then **Tools → List Tools**. You should see `list_due`, `add_deadline`,
+   `find_conflicts` and `ingest_document`.
 4. Run `find_conflicts` with the default window. It should report the visa renewal colliding
    with the school fee.
 
@@ -108,7 +110,7 @@ accept `localhost` URLs. To reach this local Streamable HTTP server, it launches
    ```
 
 6. Open Claude Desktop, start a new chat, and open the **+** menu → **Connectors**.
-   `duebook` should be listed with its three tools.
+   `duebook` should be listed with its four tools.
 
 If it doesn't connect, rerun the step 5 check (if it prints `None`, the app overwrote the
 file, so quit it and add the entry again), then check the logs:
@@ -137,3 +139,78 @@ The five seeded files in `vault/` are made-up examples with no real personal dat
 ## Licence
 
 MIT. See [LICENSE](LICENSE).
+
+## Document ingestion (Week 2)
+
+`ingest_document(path_or_text, hint=None)` reads a local PDF, UTF-8 `.txt`/`.eml`,
+or pasted text and sends extracted text to Amazon Bedrock. It returns either:
+
+- `saved`: `path` and extracted `entry` with title, due, window, classification reason,
+  source quote, confidence and notes. Duplicate title/date entries are refused.
+- `needs_confirmation`: `candidate` and one `question`. Ask the user that question;
+  call again with the **same document** and their answer in `hint`.
+
+An invalid response or AWS error fails without saving. Scans need pasted text; no OCR.
+The insurance fixture needs a receipt date: `I received it on 2026-10-01.` produces
+`2026-10-31`. Self-reported model confidence is a heuristic, not a calibrated probability.
+Schema and quote checks cannot prove that a semantically wrong date is correct.
+
+### AWS setup
+
+From the repository root (use `/usr/local/bin/aws` if the Homebrew CLI is broken):
+
+```bash
+uv sync
+/usr/local/bin/aws login --profile duebook
+export AWS_PROFILE=duebook
+export AWS_REGION=ap-southeast-1
+export DUEBOOK_MODEL_ID=apac.amazon.nova-lite-v1:0
+```
+
+Then run `uv run duebook` in that same terminal. `boto3[crt]` supports the browser-login
+credential chain. Refresh expired sessions with the login command above. Clients that
+start the server themselves must pass AWS_PROFILE and AWS_REGION in its environment.
+The default model is APAC Nova Lite, using cross-region inference within APAC.
+
+Nova returns the `extract_deadline` tool's JSON-schema payload through Converse;
+we do not parse prose or Markdown-fenced JSON. Application checks require strict ISO
+calendar dates, a 0–1 finite confidence, allowed fields, and a source quote found in the
+submitted document (whitespace normalized). Missing dates, confidence below 0.7,
+ambiguities or clarification questions prevent writes. Renewal windows and notes persist.
+
+### Cost and input limits
+
+One Converse request per ingestion attempt (at most two HTTP attempts on transient failures).
+The document plus hint is capped at 12,000 characters before JSON serialization; fixed
+prompt/schema overhead is additional. Hints are limited to 2,000 characters. Long documents
+use head + tail and **always require clarification** with a shorter relevant section.
+Output is capped at 1,400 tokens. Input/output token counts are logged to stderr without
+document content. Calls are billable; the $20 AWS budget is an alert, not a spending cap.
+Credentials stay in the standard AWS credential chain, never the repository.
+
+### Verify without changing the demo vault
+
+```bash
+uv run pytest
+uv run ruff check .
+uv run ruff format --check .
+# One opt-in billable live test, immigration fixture only:
+DUEBOOK_LIVE=1 uv run pytest tests/test_ingest.py -k live
+# Four billable calls, three synthetic documents + clarification; temporary vault only:
+uv run python scripts/check_ingestion.py
+```
+
+Offline regressions replay actual Nova Lite responses from synthetic fixtures in
+`tests/fixtures/bedrock/`. To deliberately refresh these recordings, run
+`uv run python scripts/check_ingestion.py --record` and review the resulting JSON changes.
+Real personal documents must never be used to generate committed recordings.
+
+Reference: [Nova tool choice for structured extraction](https://docs.aws.amazon.com/nova/latest/userguide/tool-choice.html).
+
+For the supported `within N days of receipt` pattern, the application requires an explicit
+receipt date in the hint and calculates the deadline itself. Missing year evidence also
+requires confirmation. Opening windows require explicit opening language in the document;
+discount and payment-plan paragraphs are retained as context. These guards cover known
+failure cases, not every natural-language date expression. The school fixture's late-payment
+penalty led Nova to classify it as hard; an invitation to request a payment plan does not
+prove that an alternative deadline has been approved.
