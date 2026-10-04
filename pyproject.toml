@@ -16,6 +16,12 @@ dependencies = [
 
 [project.scripts]
 duebook = "duebook.server:main"
+duebook-demo = "duebook.demo:main"
+
+[project.optional-dependencies]
+demo = [
+    "strands-agents>=1.57.2",
+]
 
 [build-system]
 requires = ["uv_build>=0.12.18,<0.13.0"]

@@ -1,0 +1,91 @@
+'use strict';
+const $ = id => document.getElementById(id);
+let session = sessionStorage.getItem('duebook-session');
+let busy = false;
+function node(tag, cls, text) { const e = document.createElement(tag); if(cls)e.className=cls; if(text!==undefined)e.textContent=text; return e; }
+async function request(path, payload) {
+  const options = payload === undefined ? {} : {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)};
+  const response = await fetch(path, options);
+  const data = await response.json();
+  if(!response.ok) throw new Error(data.error || 'Could not complete the request.');
+  return data;
+}
+function error(message) { $('error').textContent = message; $('error').hidden = !message; }
+function setBusy(value, message='Checking your deadlines…') {
+  busy=value;
+  document.querySelectorAll('button,input,textarea').forEach(e=>e.disabled=value);
+  $('activity').textContent=value ? message : 'Saved deadlines stay when you start a new conversation.';
+  $('messages').setAttribute('aria-busy',String(value));
+}
+async function perform(action, message) {
+  if(busy)return;
+  error('');setBusy(true,message);
+  try { return await action(); } catch(e) { error(e.message); } finally { setBusy(false); }
+}
+function render(data) {
+  error(data.warning || '');
+  $('connection').textContent=data.warning ? 'Vault connection unavailable' : 'Demo vault connected';
+  $('connection-dot').classList.toggle('ready',!data.warning);
+  if(data.messages.length) {
+    $('messages').replaceChildren();
+    for(const item of data.messages) {
+      const bubble=node('div',`bubble ${item.role}`);
+      if(item.role==='assistant')bubble.append(node('span','bubble-label','DUEBOOK'));
+      bubble.append(node('span','',item.text));$('messages').append(bubble);
+    }
+  } else {
+    const welcome=node('div','welcome');welcome.append(node('span','welcome-icon','✦'),node('h3','','What’s coming up?'),node('p','','I can help you see what’s due, spot dates that collide, and turn a document into a deadline.'));$('messages').replaceChildren(welcome);
+  }
+  $('messages').scrollTop=$('messages').scrollHeight;
+  $('pending').hidden=!data.pending;
+  if(data.pending){$('question').textContent=data.pending.question;$('candidate').textContent=`${data.pending.candidate.title} · ${data.pending.filename}`;}
+  $('count').textContent=`${data.deadlines.length} open deadlines · synthetic household`;
+  $('deadlines').replaceChildren();
+  for(const item of data.deadlines) {
+    const card=node('article','deadline'),main=node('div','deadline-main'),tile=node('div','date-tile');
+    const d=new Date(`${item.due}T12:00:00`);
+    tile.append(node('span','',d.toLocaleString('en',{month:'short'})),node('strong','',String(d.getDate())));
+    const info=node('div','deadline-info');info.append(node('h3','',item.title),node('p','',`${item.due}${item.overdue?' · Overdue in demo':''}`));
+    main.append(tile,info,node('span',`pill ${item.kind}`,item.kind));
+    const evidence=node('details','evidence');evidence.append(node('summary','','Source & calculation'),node('blockquote','',item.source));
+    if(item.notes)evidence.append(node('p','',item.notes));
+    if(item.window_start)evidence.append(node('p','',`Window opens: ${item.window_start}`));
+    evidence.append(node('p','',`Recorded confidence: ${item.confidence}. ${item.confidence_note || 'Confidence does not independently verify supplied facts.'}`));
+    card.append(main,evidence);$('deadlines').append(card);
+  }
+  if(!data.deadlines.length)$('deadlines').append(node('p','subtle','No open deadlines in this window.'));
+  $('conflicts').replaceChildren();
+  for(const c of data.conflicts) {
+    const card=node('div','conflict');card.append(node('strong','',`${c.days_apart} days apart · worth planning together`),node('p','',c.explanation));$('conflicts').append(card);
+  }
+  $('trace-panel').hidden=!data.trace.length;$('trace').replaceChildren();
+  const names={list_due:'Read saved deadlines',find_conflicts:'Checked date collisions',ingest_document:'Reviewed the document'};
+  for(const check of data.trace){$('trace').append(node('li','',`${names[check.tool]||check.tool} · ${check.status}`));}
+}
+async function refresh(){render(await request(`/api/state?session=${encodeURIComponent(session)}`));}
+async function newSession(){
+  const data=await request('/api/session',{});session=data.session;sessionStorage.setItem('duebook-session',session);$('hint').value='';await refresh();
+}
+async function send(message){await perform(async()=>{const data=await request('/api/chat',{session,message});$('message').value='';render(data);},'Thinking and checking the saved evidence…');}
+$('chat-form').addEventListener('submit',e=>{e.preventDefault();send($('message').value);});
+$('message').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();if($('message').value.trim())send($('message').value);}});
+document.querySelectorAll('[data-prompt]').forEach(b=>b.addEventListener('click',()=>send(b.dataset.prompt)));
+$('new-session').addEventListener('click',()=>perform(newSession,'Starting a fresh conversation…'));
+$('refresh').addEventListener('click',()=>perform(refresh,'Reading saved deadlines…'));
+$('confirm-form').addEventListener('submit',e=>{e.preventDefault();perform(async()=>{render(await request('/api/confirm',{session,hint:$('hint').value}));$('hint').value='';},'Checking your clarification and saving if the date is clear…');});
+$('cancel').addEventListener('click',()=>perform(async()=>render(await request('/api/cancel',{session})))) ;
+document.querySelectorAll('[data-sample]').forEach(b=>b.addEventListener('click',()=>perform(async()=>render(await request('/api/sample',{session,name:b.dataset.sample})),'Reading the synthetic sample through Bedrock…')));
+async function upload(file){
+  if(!file)return;
+  await perform(async()=>{
+    if(file.size>2*1024*1024)throw new Error('Choose a file smaller than 2 MiB.');
+    const encoded=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result.split(',')[1]);reader.onerror=()=>reject(new Error('Could not read this file.'));reader.readAsDataURL(file);});
+    render(await request('/api/upload',{session,filename:file.name,data:encoded}));
+  },'Reading the document through Bedrock…');
+  $('file').value='';
+}
+$('file').addEventListener('change',()=>upload($('file').files[0]));
+$('dropzone').addEventListener('dragover',e=>{e.preventDefault();$('dropzone').classList.add('drag');});
+$('dropzone').addEventListener('dragleave',()=>$('dropzone').classList.remove('drag'));
+$('dropzone').addEventListener('drop',e=>{e.preventDefault();$('dropzone').classList.remove('drag');upload(e.dataTransfer.files[0]);});
+perform(async()=>{if(session){try{await refresh();return;}catch{session=null;}}await newSession();},'Connecting to the demo vault…');
