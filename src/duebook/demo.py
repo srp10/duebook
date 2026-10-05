@@ -359,9 +359,21 @@ def main():
         else:
             raise SystemExit("Demo MCP server did not become ready.")
         with tempfile.TemporaryDirectory(prefix="duebook-uploads-") as temp:
-            reminders = Reminders(
-                vault, args.data_dir.resolve(), configured_sender(args.data_dir.resolve())
-            )
+            cloud_path = args.data_dir.resolve() / "cloud.json"
+            sender = configured_sender(args.data_dir.resolve())
+            if cloud_path.exists():
+                from duebook.cloud_reminders import CloudReminders
+
+                local_path = args.data_dir.resolve() / "reminders.json"
+                local = json.loads(local_path.read_text()) if local_path.exists() else {}
+                if any(p.get("status") == "active" for p in local.get("plans", {}).values()):
+                    raise DemoError("Cancel active local plans before enabling cloud mode.")
+                cloud = json.loads(cloud_path.read_text())
+                reminders = CloudReminders(
+                    vault, args.data_dir.resolve(), sender, cloud["function"]
+                )
+            else:
+                reminders = Reminders(vault, args.data_dir.resolve(), sender)
             service = DemoService(
                 StrandsBridge(f"http://127.0.0.1:{mcp_port}/mcp"), Path(temp), reminders
             )

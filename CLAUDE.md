@@ -157,3 +157,12 @@ file state, not an always-on cloud deployment. Disclose server/awake/login requi
 Never enroll deadlines automatically or expose send/write controls to model-generated chat.
 Keep personal email addresses and delivery state out of Git. Delivery tests need the user's
 chosen verified address; do not infer it from AWS identity or send to a repository author.
+
+## Phase update — Cloud reminders authorized October 5 2026
+
+After receiving the local SES test, the user explicitly authorized moving delivery to AWS
+so the Mac may sleep. Use a private single-writer Lambda/S3 service and EventBridge Scheduler,
+with scoped roles and explicit per-deadline approval. No public endpoint or automatic
+migration/enrollment. Keep reserved concurrency at one. Cloud stores approved message
+snapshots; offline vault edits cannot update AWS until the app reconnects. Keep deployment
+email settings outside Git. This supersedes the earlier local-worker-only limit.

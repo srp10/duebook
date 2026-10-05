@@ -357,3 +357,48 @@ if the Mac was asleep. No overdue daily escalation or cloud deployment in this v
 
 References: [SES verification](https://docs.aws.amazon.com/boto3/latest/guide/ses-verify.html),
 [SES SendEmail](https://docs.aws.amazon.com/ses/latest/APIReference-V2/API_SendEmail.html).
+
+### AWS reminder delivery (optional, authorized October 5)
+
+`infra/build_template.py` generates a CloudFormation template for a private S3 state bucket,
+a Lambda worker, and EventBridge Scheduler (every minute). No public endpoint is created.
+Only explicitly previewed/approved emails are uploaded. The vault and chat stay local.
+AWS resources incur usage charges; remove the stack when the demo is retired. The state
+bucket is retained on deletion to preserve the delivery audit; delete it separately only
+when that audit is no longer needed.
+
+Deploy with a verified SES address in the same region:
+
+```sh
+python infra/build_template.py > /tmp/duebook-cloud.json
+aws cloudformation deploy --template-file /tmp/duebook-cloud.json \
+  --stack-name duebook-reminders --parameter-overrides Email=YOUR_VERIFIED_EMAIL \
+  --capabilities CAPABILITY_IAM --profile duebook --region ap-southeast-1
+```
+
+Keep `email.json` as above. Put `{"function":"FUNCTION_ARN_FROM_STACK_OUTPUT"}` in
+`cloud.json` inside the chosen ignored `.duebook-demo/` data directory, then restart.
+Cancel any active **local** plans first; startup refuses to run cloud mode alongside them.
+Existing local plans are never silently copied or enrolled. Old local attempt history is
+retained in its file; cloud delivery has a separate history.
+
+In cloud mode the UI says **AWS delivery ready**. Preview, enable, snooze, cancel and done
+use the authenticated Lambda service; the local background watcher only pauses cloud plans
+when local files change. A cloud failure cannot silently mark a local deadline done.
+The Mac and browser may be closed after approval. AWS uses the last approved email body;
+**offline edits to the markdown vault do not change cloud plans**. Reopen the app online to
+reconcile, or cancel a plan explicitly before editing. A cloud request can be busy while
+another is running: refresh before retrying an uncertain mutation. Cancel cannot recall
+an email already claimed for delivery.
+
+The worker's **reserved concurrency must remain one**: all commands and scheduled checks
+share this single serialized writer. S3 state is persisted before SES is called. Unknown
+outcomes pause the plan and are not automatically retried. A crash before the actual send
+can therefore skip an email; avoiding duplicates takes priority. SES acceptance is not
+proof of inbox delivery. Missed triggers coalesce; checks run roughly once per minute,
+not at an exact second. The daily cap is 20 attempts for this cloud deployment, five per tick.
+Use CloudWatch errors and the private state's `last_tick` to diagnose scheduling failures.
+This is a demo service, without bounce monitoring, public hosting, or remote email actions.
+
+AWS references: [scheduled Lambda invocation](https://docs.aws.amazon.com/lambda/latest/dg/with-eventbridge-scheduler.html)
+and [Scheduler timing](https://docs.aws.amazon.com/scheduler/latest/UserGuide/schedule-types.html).

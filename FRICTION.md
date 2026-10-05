@@ -194,3 +194,16 @@ Format: task attempted · steps · expected vs actual · severity · workaround 
   unknown outcome. Tests cover competing workers and a crash after the durable claim.
 - **Suggestion:** Add delivery event tracking for a deployed version; do not equate API
   acceptance with receipt or promise exactly-once inbox delivery.
+
+
+## 18. Cloud reminders need an explicit snapshot boundary (2026-10-05)
+
+- **Task attempted:** deliver while the Mac and local vault are offline.
+- **Expected vs actual:** AWS cannot observe an offline markdown edit. Sending from a stale
+  approved snapshot must not be presented as live synchronization.
+- **Severity:** medium; misleading cancellation expectations would be high impact.
+- **Workaround:** cloud controls confirm remote changes before local completion; an online
+  watcher pauses changed records. The UI explains that offline edits do not update AWS.
+  No local plans are automatically migrated. Lambda reserved concurrency stays at one,
+  and durable pre-send claims prevent automatic retries of ambiguous email sends.
+- **Suggestion:** a later authenticated cloud vault could make edits authoritative everywhere.

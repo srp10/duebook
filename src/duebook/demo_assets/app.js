@@ -150,7 +150,11 @@ function reminderButton(label,action,key,token) {
 }
 function renderReminders(data) {
   const info=data.reminders;
-  $('reminder-status').textContent=info ? (info.configured ? `Recipient: ${info.to}` : 'Email is not configured yet. No messages will be sent.') : 'Reminder controls unavailable. Restart the updated server.';
+  const cloud=info?.mode==='cloud';
+  $('email-setup').hidden=cloud;
+  $('reminder-delivery').textContent=cloud ? 'Runs on AWS, even when your Mac is asleep. Emails are scheduled for 9am Hong Kong time, 7 days before, 1 day before and on the due date. Use this app online to change or cancel a plan; offline file edits do not update AWS.' : 'Opt in on each deadline. Scheduled for 9am Hong Kong time, 7 days before, 1 day before and on the due date. Keep this Mac awake and the server running; the browser can be closed.';
+  $('delivery-footer').textContent=cloud ? 'Email reminders run on AWS after you opt in.' : 'Email reminders require opt-in and the local server.';
+  $('reminder-status').textContent=info ? (info.configured ? `${cloud?'AWS delivery ready':'Local delivery ready'} · ${info.to}` : 'Email is not configured yet. No messages will be sent.') : 'Reminder controls unavailable. Restart the updated server.';
   if(info?.worker_error)$('reminder-status').textContent += ' '+info.worker_error;
   const box=$('email-preview');box.replaceChildren();const dialog=$('preview-dialog');
   if(!data.email_preview && dialog.open){dialog.close();restorePreviewFocus=true;}
