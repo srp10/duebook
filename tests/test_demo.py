@@ -123,7 +123,7 @@ def test_snapshot_failure_does_not_erase_successful_save(service):
     result = service.confirm(sid, "2026-10-01")
     assert result["warning"]
     assert result["pending"] is None
-    assert result["messages"][-1]["text"].startswith("Saved Insurance")
+    assert result["document_result"]["message"].startswith("Saved Insurance")
     assert len(service.bridge.saved) == 1
 
 
@@ -359,4 +359,20 @@ def test_overdue_button_preserves_hint_and_requires_pending_past_date(service):
     result = service.confirm_overdue(sid)
     assert calls[-1] == ("2026-01-05", "2026-02-04")
     assert result["pending"] is None
-    assert "overdue, as you confirmed" in result["messages"][-1]["text"]
+    assert "overdue, as you confirmed" in result["document_result"]["message"]
+
+
+def test_document_flow_is_separate_from_chat_and_cancel_has_local_feedback(service):
+    sid = service.create()["session"]
+    result = upload(service, sid)
+    assert result["messages"] == []
+    assert result["document_result"]["status"] == "needs_confirmation"
+    result = service.cancel(sid)
+    assert result["pending"] is None
+    assert result["document_result"]["status"] == "cancelled"
+    assert result["messages"] == []
+    upload(service, sid)
+    result = service.confirm(sid, "2026-10-01")
+    assert result["document_result"]["entry"]["due"] == "2026-10-31"
+    assert result["messages"] == []
+    assert service.state(sid)["document_result"] == result["document_result"]

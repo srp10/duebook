@@ -2,6 +2,7 @@
 const $ = id => document.getElementById(id);
 let session = sessionStorage.getItem('duebook-session');
 let busy = false;
+let documentActionActive=false;
 let latestState;
 let selectedFilter = "all";
 let toastTimer;
@@ -15,13 +16,15 @@ async function request(path, payload) {
   if(!response.ok) throw new Error(data.error || 'Could not complete the request.');
   return data;
 }
-function error(message) { $('error').textContent = message; $('error').hidden = !message; $('preview-error').textContent=message; $('preview-error').hidden=!message; }
+function error(message) { if(documentActionActive){$('document-error').textContent=message;$('document-error').hidden=!message;return;} $('error').textContent = message; $('error').hidden = !message; $('preview-error').textContent=message; $('preview-error').hidden=!message; }
 function notify(message) { clearTimeout(toastTimer); $('toast').textContent=message; $('toast').hidden=false; toastTimer=setTimeout(()=>$('toast').hidden=true,5000); }
 function setBusy(value, message='Checking your deadlines…') {
   busy=value;
   document.querySelectorAll('button,input,textarea').forEach(e=>e.disabled=value || e.dataset.unavailable === "true");
-  $('activity').textContent=value ? message : 'Saved deadlines stay when you start a new conversation.';
-  $('messages').setAttribute('aria-busy',String(value));
+  $('activity').textContent=value && !documentActionActive ? message : 'Saved deadlines stay when you start a new conversation.';
+  $('messages').setAttribute('aria-busy',String(value && !documentActionActive));
+  $('document-panel').setAttribute('aria-busy',String(value && documentActionActive));
+  if(documentActionActive){$('document-status').hidden=!value;$('document-status').textContent=message;if(value)$('document-status').scrollIntoView({block:'nearest'});}
 }
 async function perform(action, message) {
   if(busy)return;
@@ -46,10 +49,12 @@ function render(data) {
     const welcome=node('div','welcome');welcome.append(node('span','welcome-icon','✦'),node('h3','','What’s coming up?'),node('p','','I can help you see what’s due, spot dates that collide, and turn a document into a deadline.'));$('messages').replaceChildren(welcome);
   }
   $('messages').scrollTop=$('messages').scrollHeight;
+  renderDocument(data);
+  if(documentActionActive)requestAnimationFrame(()=>$(data.pending?'pending':'document-result').scrollIntoView({block:'nearest'}));
   $('pending').hidden=!data.pending;
   $('save-overdue').hidden=data.pending?.confirmation_type!=='past_due';
   $('confirm-form').querySelector('button').textContent=data.pending?.confirmation_type==='past_due'?'Correct date':'Confirm';
-  if(data.pending){$('assistant-panel').scrollIntoView({behavior:'smooth',block:'start'}); $('question').textContent=data.pending.question;$('candidate').textContent=`${data.pending.candidate.title} · ${data.pending.filename}`;}
+  if(data.pending){$('question').textContent=data.pending.question;$('candidate').textContent=`${data.pending.candidate.title} · ${data.pending.filename}`;}
   renderReminders(data);
   $('count').textContent=`${data.deadlines.length} open deadlines · synthetic household`;
   $('deadlines').replaceChildren();
@@ -117,13 +122,13 @@ $('new-session').addEventListener('click',()=>perform(async()=>{
   requestAnimationFrame(()=>$('message').focus({preventScroll:true}));
 },'Starting a fresh conversation…'));
 $('refresh').addEventListener('click',()=>perform(refresh,'Reading saved deadlines…'));
-$('confirm-form').addEventListener('submit',e=>{e.preventDefault();perform(async()=>{render(await request('/api/confirm',{session,hint:$('hint').value}));$('hint').value='';},'Checking your clarification and saving if the date is clear…');});
-$('save-overdue').addEventListener('click',()=>perform(async()=>{render(await request('/api/confirm-overdue',{session}));$('hint').value='';},'Confirming the overdue date…'));
-$('cancel').addEventListener('click',()=>perform(async()=>render(await request('/api/cancel',{session})))) ;
-document.querySelectorAll('[data-sample]').forEach(b=>b.addEventListener('click',()=>perform(async()=>render(await request('/api/sample',{session,name:b.dataset.sample})),'Reading the synthetic sample through Bedrock…')));
+$('confirm-form').addEventListener('submit',e=>{e.preventDefault();performDocument(async()=>{render(await request('/api/confirm',{session,hint:$('hint').value}));$('hint').value='';},'Checking your clarification and saving if the date is clear…');});
+$('save-overdue').addEventListener('click',()=>performDocument(async()=>{render(await request('/api/confirm-overdue',{session}));$('hint').value='';},'Confirming the overdue date…'));
+$('cancel').addEventListener('click',()=>performDocument(async()=>render(await request('/api/cancel',{session})))) ;
+document.querySelectorAll('[data-sample]').forEach(b=>b.addEventListener('click',()=>performDocument(async()=>render(await request('/api/sample',{session,name:b.dataset.sample})),'Reading the synthetic sample through Bedrock…')));
 async function upload(file){
   if(!file)return;
-  await perform(async()=>{
+  await performDocument(async()=>{
     if(file.size>2*1024*1024)throw new Error('Choose a file smaller than 2 MiB.');
     const encoded=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result.split(',')[1]);reader.onerror=()=>reject(new Error('Could not read this file.'));reader.readAsDataURL(file);});
     render(await request('/api/upload',{session,filename:file.name,data:encoded}));
@@ -198,3 +203,25 @@ document.querySelectorAll('[data-filter]').forEach(button=>button.addEventListen
   if(latestState)render(latestState);
 }));
 $('preview-dialog').addEventListener('cancel',event=>{event.preventDefault();if(!busy)perform(async()=>render(await request('/api/reminders',{session,action:'dismiss'})));});
+
+async function performDocument(action,message='Updating this document…') {
+  if(busy)return;
+  documentActionActive=true;
+  $('error').hidden=true;
+  $('document-result').hidden=true;
+  try { await perform(action,message); }
+  finally { documentActionActive=false; }
+}
+function renderDocument(data) {
+  const box=$('document-result');box.replaceChildren();
+  const result=data.document_result;
+  box.hidden=!result || !!data.pending;
+  if(!result || data.pending)return;
+  box.append(node('p','eyebrow',result.status==='saved'?'SAVED TO YOUR DEADLINES':'DOCUMENT UPDATE'));
+  if(result.filename)box.append(node('p','subtle',result.filename));
+  box.append(node('p','',result.message));
+  if(result.entry){
+    box.append(node('blockquote','',result.entry.source || ''));
+    const link=node('a','text-button','View saved deadlines ↑');link.href='#deadlines';box.append(link);
+  }
+}

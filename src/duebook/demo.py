@@ -36,6 +36,7 @@ SAMPLES = {
 class Conversation:
     history: list[dict] = field(default_factory=list)
     pending: dict | None = None
+    document_result: dict | None = None
     trace: list = field(default_factory=list)
     email_preview: dict | None = None
     lock: threading.Lock = field(default_factory=threading.Lock)
@@ -99,6 +100,7 @@ class DemoService:
             "email_preview": session.email_preview,
             "messages": session.history,
             "pending": pending,
+            "document_result": session.document_result,
             "trace": session.trace,
             "warning": warning,
         }
@@ -227,14 +229,12 @@ class DemoService:
             )
         else:
             raise DemoError("The ingestion tool returned an unknown status.")
-        session.history.extend(
-            [
-                {"role": "user", "text": f"Review document: {filename}"},
-                {"role": "assistant", "text": text},
-            ]
-        )
-        session.history = session.history[-24:]
-        session.trace = [{"tool": "ingest_document", "status": result["status"]}]
+        session.document_result = {
+            "status": result["status"],
+            "filename": filename,
+            "message": text,
+            "entry": result.get("entry"),
+        }
         return self._state(session)
 
     def cancel(self, session_id: str) -> dict:
@@ -243,6 +243,10 @@ class DemoService:
             if session.pending:
                 session.pending["path"].unlink(missing_ok=True)
                 session.pending = None
+                session.document_result = {
+                    "status": "cancelled",
+                    "message": "Document cancelled. Nothing was saved.",
+                }
             return self._state(session)
 
 
