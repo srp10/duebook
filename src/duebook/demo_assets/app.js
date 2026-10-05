@@ -101,13 +101,20 @@ function render(data) {
 }
 async function refresh(){render(await request(`/api/state?session=${encodeURIComponent(session)}`));}
 async function newSession(){
-  const data=await request('/api/session',{});session=data.session;sessionStorage.setItem('duebook-session',session);$('hint').value='';await refresh();
+  const data=await request('/api/session',{});session=data.session;sessionStorage.setItem('duebook-session',session);$('hint').value='';$('message').value='';await refresh();
 }
 async function send(message){await perform(async()=>{const data=await request('/api/chat',{session,message});$('message').value='';render(data);},'Thinking and checking the saved evidence…');}
 $('chat-form').addEventListener('submit',e=>{e.preventDefault();send($('message').value);});
 $('message').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();if($('message').value.trim())send($('message').value);}});
 document.querySelectorAll('[data-prompt]').forEach(b=>b.addEventListener('click',()=>send(b.dataset.prompt)));
-$('new-session').addEventListener('click',()=>perform(newSession,'Starting a fresh conversation…'));
+$('new-session').addEventListener('click',()=>perform(async()=>{
+  await newSession();
+  $('messages').querySelector('.welcome h3').textContent='Your fresh conversation is ready.';
+  $('messages').querySelector('.welcome p').textContent='Ask a new question. Your saved deadlines and reminders are still here.';
+  notify('New conversation started. Saved deadlines and reminders are unchanged.');
+  $('assistant-panel').scrollIntoView({behavior:'smooth',block:'start'});
+  requestAnimationFrame(()=>$('message').focus({preventScroll:true}));
+},'Starting a fresh conversation…'));
 $('refresh').addEventListener('click',()=>perform(refresh,'Reading saved deadlines…'));
 $('confirm-form').addEventListener('submit',e=>{e.preventDefault();perform(async()=>{render(await request('/api/confirm',{session,hint:$('hint').value}));$('hint').value='';},'Checking your clarification and saving if the date is clear…');});
 $('cancel').addEventListener('click',()=>perform(async()=>render(await request('/api/cancel',{session})))) ;
