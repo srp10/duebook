@@ -217,11 +217,20 @@ function renderDocument(data) {
   const result=data.document_result;
   box.hidden=!result || !!data.pending;
   if(!result || data.pending)return;
-  box.append(node('p','eyebrow',result.status==='saved'?'SAVED TO YOUR DEADLINES':'DOCUMENT UPDATE'));
+  box.append(node('p','eyebrow',result.status==='saved'?'SAVED TO YOUR DEADLINES':result.status==='already_saved'?'ALREADY SAVED':'DOCUMENT UPDATE'));
   if(result.filename)box.append(node('p','subtle',result.filename));
   box.append(node('p','',result.message));
   if(result.entry){
     box.append(node('blockquote','',result.entry.source || ''));
-    const link=node('a','text-button','View saved deadlines ↑');link.href='#deadlines';box.append(link);
+    const link=node('button','text-button',result.status==='already_saved'?'View existing deadline ↑':'View saved deadline ↑');
+    link.addEventListener('click',()=>{
+      selectedFilter='all';document.querySelectorAll('[data-filter]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.filter==='all')));
+      render(latestState);
+      const item=latestState.deadlines.find(d=>d.title===result.entry.title && d.due===result.entry.due);
+      const key=item && (item.key || item.title+item.due);
+      const card=[...document.querySelectorAll('.deadline')].find(c=>c.dataset.key===key);
+      if(card){card.querySelector('.evidence').open=true;card.tabIndex=-1;card.scrollIntoView({block:'center'});card.focus({preventScroll:true});}
+      else notify('This saved record is outside the current open-deadline view.');
+    });box.append(link);
   }
 }

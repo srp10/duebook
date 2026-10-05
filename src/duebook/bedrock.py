@@ -242,6 +242,17 @@ class BedrockExtractor:
                 inferenceConfig={"maxTokens": 1400, "temperature": 0},
             )
         except (BotoCoreError, ClientError) as exc:
+            code = getattr(exc, "response", {}).get("Error", {}).get("Code", "")
+            if type(exc).__name__ in (
+                "LoginRefreshRequired",
+                "TokenRetrievalError",
+                "UnauthorizedSSOTokenError",
+            ) or code in ("ExpiredToken", "ExpiredTokenException", "RequestExpired"):
+                raise ExtractionError(
+                    "Your AWS session has expired. Nothing was saved. "
+                    "In Terminal, run /usr/local/bin/aws login --profile duebook, "
+                    "then retry this document."
+                ) from None
             raise ExtractionError(
                 f"Bedrock call failed ({type(exc).__name__}). Check AWS login, model access "
                 "and region; nothing was saved."

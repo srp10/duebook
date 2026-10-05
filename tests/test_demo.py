@@ -376,3 +376,19 @@ def test_document_flow_is_separate_from_chat_and_cancel_has_local_feedback(servi
     assert result["document_result"]["entry"]["due"] == "2026-10-31"
     assert result["messages"] == []
     assert service.state(sid)["document_result"] == result["document_result"]
+
+
+def test_duplicate_result_clears_pending_and_temporary_upload(service):
+    sid = service.create()["session"]
+    upload(service, sid)
+    path = service.bridge.calls[-1][0]
+    service.bridge.ingest = lambda *a: {
+        "status": "already_saved",
+        "entry": {"title": "Insurance", "due": "2026-10-31", "source": "Original quote"},
+    }
+    result = service.confirm(sid, "2026-10-01")
+    assert not path.exists()
+    assert result["pending"] is None
+    assert result["document_result"]["status"] == "already_saved"
+    assert "No duplicate was added" in result["document_result"]["message"]
+    assert result["messages"] == []

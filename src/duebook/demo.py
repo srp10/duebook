@@ -218,6 +218,14 @@ class DemoService:
                 "confirmation_type": result.get("confirmation_type", "clarification"),
             }
             text = result["question"] + " Nothing has been saved yet."
+        elif result["status"] == "already_saved":
+            session.pending = None
+            path.unlink(missing_ok=True)
+            entry = result["entry"]
+            text = (
+                f"Already saved: {entry['title']}, due {entry['due']}. "
+                "No duplicate was added. Your existing record is unchanged."
+            )
         elif result["status"] == "saved":
             session.pending = None
             path.unlink(missing_ok=True)

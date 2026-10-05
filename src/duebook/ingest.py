@@ -30,6 +30,11 @@ def ingest_document(
         if not question:
             question = f"What exact due date (YYYY-MM-DD) should I use for {candidate['title']}?"
         return {"status": "needs_confirmation", "candidate": candidate, "question": question}
+    for existing in vault.read_all(vault_dir):
+        if vault.slugify(existing.title, existing.due) == vault.slugify(
+            candidate["title"].strip(), date.fromisoformat(candidate["due"])
+        ):
+            return {"status": "already_saved", "entry": existing.summary()}
     current = today or datetime.now(ZoneInfo("Asia/Hong_Kong")).date()
     overdue = date.fromisoformat(candidate["due"]) < current
     if overdue and confirmed_past_due != candidate["due"]:

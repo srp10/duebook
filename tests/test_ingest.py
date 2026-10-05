@@ -44,8 +44,10 @@ def test_ingest_pdf_persists_window_and_duplicate_refusal(vault_dir):
         load_text(path).split()
     )
     assert "Classification:" in saved.notes
-    with pytest.raises(ValueError, match="duplicate"):
-        ingest_document(vault_dir, path, extractor=extractor())
+    before = saved.path.read_bytes()
+    duplicate = ingest_document(vault_dir, path, extractor=extractor())
+    assert duplicate["status"] == "already_saved"
+    assert saved.path.read_bytes() == before
     assert len(read_all(vault_dir)) == 1
 
 
@@ -313,4 +315,18 @@ def test_direct_past_date_is_guarded(vault_dir):
         today=date(2026, 12, 1),
     )
     assert result["confirmation_type"] == "past_due"
+    assert not read_all(vault_dir)
+
+
+@pytest.mark.parametrize("code", ["ExpiredToken", "ExpiredTokenException", "RequestExpired"])
+def test_expired_login_has_recovery_instructions_without_writes(vault_dir, code):
+    class ExpiredClient:
+        def converse(self, **kwargs):
+            raise ClientError({"Error": {"Code": code, "Message": "expired"}}, "Converse")
+
+    with pytest.raises(ExtractionError, match="AWS session has expired") as error:
+        ingest_document(
+            vault_dir, "Fees due 2026-11-15", extractor=BedrockExtractor(ExpiredClient())
+        )
+    assert "aws login --profile duebook" in str(error.value)
     assert not read_all(vault_dir)
