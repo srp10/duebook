@@ -112,7 +112,6 @@ $('new-session').addEventListener('click',()=>perform(async()=>{
   $('messages').querySelector('.welcome h3').textContent='Your fresh conversation is ready.';
   $('messages').querySelector('.welcome p').textContent='Ask a new question. Your saved deadlines and reminders are still here.';
   notify('New conversation started. Saved deadlines and reminders are unchanged.');
-  $('assistant-panel').scrollIntoView({behavior:'smooth',block:'start'});
   requestAnimationFrame(()=>$('message').focus({preventScroll:true}));
 },'Starting a fresh conversation…'));
 $('refresh').addEventListener('click',()=>perform(refresh,'Reading saved deadlines…'));
