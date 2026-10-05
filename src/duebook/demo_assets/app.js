@@ -39,6 +39,7 @@ function render(data) {
   $('messages').scrollTop=$('messages').scrollHeight;
   $('pending').hidden=!data.pending;
   if(data.pending){$('question').textContent=data.pending.question;$('candidate').textContent=`${data.pending.candidate.title} · ${data.pending.filename}`;}
+  renderReminders(data);
   $('count').textContent=`${data.deadlines.length} open deadlines · synthetic household`;
   $('deadlines').replaceChildren();
   for(const item of data.deadlines) {
@@ -51,7 +52,21 @@ function render(data) {
     if(item.notes)evidence.append(node('p','',item.notes));
     if(item.window_start)evidence.append(node('p','',`Window opens: ${item.window_start}`));
     evidence.append(node('p','',`Recorded confidence: ${item.confidence}. ${item.confidence_note || 'Confidence does not independently verify supplied facts.'}`));
-    card.append(main,evidence);$('deadlines').append(card);
+    card.append(main,evidence);
+    if(data.reminders && item.key) {
+      const info=data.reminders.items[item.key] || {status:'off'};
+      const controls=node('div','reminder-controls');
+      controls.append(node('p','subtle',`Reminders: ${info.status}${info.next?' · next '+new Date(info.next).toLocaleString('en-GB',{timeZone:'Asia/Hong_Kong'})+' HKT':''}`));
+      if(info.error)controls.append(node('p','reminder-error',info.error));
+      if(info.last)controls.append(node('p','subtle',`Last email attempt: ${info.last.status === 'accepted' ? 'accepted by SES (inbox delivery not confirmed)' : info.last.status}${info.last.error?' · '+info.last.error:''}`));
+      controls.append(reminderButton('Preview email','preview',item.key));
+      if(info.status==='active') {
+        if(info.next)controls.append(reminderButton('Snooze 24 hours','snooze',item.key));
+        controls.append(reminderButton('Cancel reminders','cancel',item.key));
+      }
+      controls.append(reminderButton('Mark done','done',item.key));card.append(controls);
+    }
+    $('deadlines').append(card);
   }
   if(!data.deadlines.length)$('deadlines').append(node('p','subtle','No open deadlines in this window.'));
   $('conflicts').replaceChildren();
@@ -89,3 +104,31 @@ $('dropzone').addEventListener('dragover',e=>{e.preventDefault();$('dropzone').c
 $('dropzone').addEventListener('dragleave',()=>$('dropzone').classList.remove('drag'));
 $('dropzone').addEventListener('drop',e=>{e.preventDefault();$('dropzone').classList.remove('drag');upload(e.dataTransfer.files[0]);});
 perform(async()=>{if(session){try{await refresh();return;}catch{session=null;}}await newSession();},'Connecting to the demo vault…');
+
+
+function reminderButton(label,action,key,token) {
+  const button=node('button','quiet',label);
+  button.addEventListener('click',()=>perform(async()=>{
+    const data=await request('/api/reminders',{session,action,key,token});
+    render(data);
+    if(action==='preview')$('email-preview').scrollIntoView({behavior:'smooth',block:'center'});
+  }, action==='test'?'Sending the approved email once…':'Updating reminder settings…'));
+  return button;
+}
+function renderReminders(data) {
+  const info=data.reminders;
+  $('reminder-status').textContent=info ? (info.configured ? `Recipient: ${info.to}` : 'Email is not configured yet. No messages will be sent.') : 'Reminder controls unavailable. Restart the updated server.';
+  if(info?.worker_error)$('reminder-status').textContent += ' '+info.worker_error;
+  const box=$('email-preview');box.replaceChildren();box.hidden=!data.email_preview;
+  if(data.email_preview) {
+    const p=data.email_preview;
+    box.append(node('h3','','Preview before sending'),node('p','',`From: ${p.from}`),node('p','',`To: ${p.to}`),node('strong','',p.subject),node('pre','email-body',p.body));
+    box.append(node('p','subtle',p.schedule.length ? 'Scheduled times (HKT): '+p.schedule.map(t=>new Date(t).toLocaleString('en-GB',{timeZone:'Asia/Hong_Kong'})).join('; ') : 'No future standard reminder dates remain.'));
+    box.append(node('p','subtle','The message above includes the saved source and context. Enabling reminders consents to sending it on the listed dates. Sending once does not enable the schedule. If a send fails, check your inbox before retrying.'));
+    if(p.schedule.length && info.items[p.key]?.status!=='active')box.append(reminderButton('Enable these email reminders','enable',p.key,p.token));
+    box.append(reminderButton('Send this email once','test',p.key,p.token),reminderButton('Close preview','dismiss'));
+  }
+  const completed=$('completed-deadlines');completed.replaceChildren();
+  for(const d of info?.completed || [])completed.append(node('p','',`${d.title} · due ${d.due} · done`));
+  if(!info?.completed?.length)completed.append(node('p','subtle','No completed deadlines yet.'));
+}

@@ -27,10 +27,11 @@
     </section>
     <aside class="overview">
       <section class="upload panel"><div class="section-title"><h2>Give a date some context.</h2><span aria-hidden="true">↥</span></div><p>Drop in a letter or email. Duebook finds the obligation and asks about missing details.</p><label class="dropzone" id="dropzone" for="file"><span class="file-icon" aria-hidden="true">▤</span><strong>Choose a document</strong><span>PDF, TXT or EML · up to 2 MiB</span></label><input id="file" type="file" accept=".pdf,.txt,.eml" class="sr-only"><p class="privacy">Text is sent to Amazon Bedrock for extraction. Use synthetic documents for this demo.</p><div class="sample-row"><span>Try a sample</span><button data-sample="insurance">Insurance</button><button data-sample="immigration">Visa</button><button data-sample="school">School fees</button></div></section>
+      <section class="panel reminder-panel"><h2>Email reminders</h2><p id="reminder-status">Loading reminder setup…</p><p class="subtle">Opt in on each deadline. Scheduled for 9am Hong Kong time, 7 days before, 1 day before and on the due date. Keep this Mac awake and the server running; the browser can be closed.</p><div id="email-preview" hidden></div><details><summary>Completed deadlines</summary><div id="completed-deadlines"></div></details></section>
       <section class="deadlines panel"><div class="section-title"><h2>Your next 60 days</h2><button id="refresh" class="text-button">Refresh</button></div><p id="count" class="subtle">Reading saved deadlines…</p><div id="conflicts"></div><div id="deadlines"></div></section>
     </aside>
   </div>
   <div id="error" class="error" role="alert" hidden></div>
-  <footer class="page-footer"><span><span class="tiny-orb" aria-hidden="true"></span>Real tools. Synthetic household. Simulated Alexa+ experience.</span><span>No Alexa connection or scheduled notifications.</span></footer>
+  <footer class="page-footer"><span><span class="tiny-orb" aria-hidden="true"></span>Real tools. Synthetic household. Simulated Alexa+ experience.</span><span>Alexa is simulated. Email reminders require opt-in and the local server.</span></footer>
 </main>
 </body></html>

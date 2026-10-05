@@ -20,6 +20,7 @@ from urllib.parse import parse_qs, urlparse
 from uuid import uuid4
 
 from duebook.demo_agent import DemoError, StrandsBridge
+from duebook.reminders import Reminders, configured_sender, key_for
 
 ASSETS = Path(__file__).parent / "demo_assets"
 MAX_FILE = 2 * 1024 * 1024
@@ -36,12 +37,14 @@ class Conversation:
     history: list[dict] = field(default_factory=list)
     pending: dict | None = None
     trace: list = field(default_factory=list)
+    email_preview: dict | None = None
     lock: threading.Lock = field(default_factory=threading.Lock)
 
 
 class DemoService:
-    def __init__(self, bridge, uploads: Path):
+    def __init__(self, bridge, uploads: Path, reminders=None):
         self.bridge = bridge
+        self.reminders = reminders
         self.uploads = uploads
         self.uploads.mkdir(parents=True, exist_ok=True)
         self.sessions = {}
@@ -81,7 +84,16 @@ class DemoService:
         pending = None
         if session.pending:
             pending = {k: session.pending[k] for k in ("question", "candidate", "filename")}
+        reminder_state = self.reminders.overview() if self.reminders else None
+        if self.reminders:
+            records = {
+                (d.title, d.due.isoformat()): key_for(d) for d in self.reminders.records().values()
+            }
+            for row in snapshot["deadlines"]:
+                row["key"] = records.get((row["title"], row["due"]))
         return snapshot | {
+            "reminders": reminder_state,
+            "email_preview": session.email_preview,
             "messages": session.history,
             "pending": pending,
             "trace": session.trace,
@@ -102,6 +114,29 @@ class DemoService:
             )
             session.history = session.history[-24:]
             session.trace = result["trace"]
+            return self._state(session)
+
+    def reminder_action(self, session_id, action, key=None, token=None):
+        session = self.get(session_id)
+        if self.reminders is None:
+            raise DemoError("Reminder controls are unavailable in this server.")
+        with session.lock:
+            if action == "preview":
+                session.email_preview = self.reminders.preview(key) | {"token": str(uuid4())}
+            elif action == "dismiss":
+                session.email_preview = None
+            elif action in ("enable", "test"):
+                preview = session.email_preview
+                if not preview or token != preview["token"]:
+                    raise DemoError("Preview the message before approving email delivery.")
+                # Consume approval once even if the result is uncertain.
+                session.email_preview = None
+                self.reminders.approve(preview, action)
+            elif action in ("done", "cancel", "snooze"):
+                self.reminders.change(key, action)
+                session.email_preview = None
+            else:
+                raise DemoError("Unknown reminder action.")
             return self._state(session)
 
     def upload(self, session_id: str, filename: str, encoded: str) -> dict:
@@ -252,6 +287,9 @@ def make_handler(service):
                 sid = body.get("session", "")
                 routes = {
                     "/api/session": lambda: service.create(),
+                    "/api/reminders": lambda: service.reminder_action(
+                        sid, body.get("action"), body.get("key"), body.get("token")
+                    ),
                     "/api/chat": lambda: service.chat(sid, body.get("message")),
                     "/api/upload": lambda: service.upload(
                         sid, body.get("filename"), body.get("data")
@@ -321,16 +359,23 @@ def main():
         else:
             raise SystemExit("Demo MCP server did not become ready.")
         with tempfile.TemporaryDirectory(prefix="duebook-uploads-") as temp:
-            service = DemoService(StrandsBridge(f"http://127.0.0.1:{mcp_port}/mcp"), Path(temp))
+            reminders = Reminders(
+                vault, args.data_dir.resolve(), configured_sender(args.data_dir.resolve())
+            )
+            service = DemoService(
+                StrandsBridge(f"http://127.0.0.1:{mcp_port}/mcp"), Path(temp), reminders
+            )
             server = ThreadingHTTPServer(("127.0.0.1", args.port), make_handler(service))
             print(f"Duebook demo: http://127.0.0.1:{server.server_port}", flush=True)
             print(f"Synthetic demo vault: {vault}", flush=True)
+            reminders.start()
             try:
                 server.serve_forever()
             except KeyboardInterrupt:
                 pass
             finally:
                 server.server_close()
+                reminders.close()
     finally:
         child.terminate()
         try:
