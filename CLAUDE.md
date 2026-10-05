@@ -147,3 +147,13 @@ supersedes the earlier no-UI/no-Strands phase restriction for this work.
 - AgentCore, voice, scheduled reminders, public hosting/auth and calendar sync are separate
   follow-ups. Do not claim this is connected to Alexa or sends reminders.
 - Validate offline guardrails and one live browser flow, then document observed friction.
+
+## Phase update — Email reminders authorized October 5 2026
+
+The user reopened reminder scope and explicitly approved email delivery with previews,
+per-deadline opt-in, done/snooze/cancel controls. This supersedes earlier reminder exclusions.
+Use existing boto3/SES; no added dependencies. First version is a local worker with persisted
+file state, not an always-on cloud deployment. Disclose server/awake/login requirements.
+Never enroll deadlines automatically or expose send/write controls to model-generated chat.
+Keep personal email addresses and delivery state out of Git. Delivery tests need the user's
+chosen verified address; do not infer it from AWS identity or send to a repository author.

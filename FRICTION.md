@@ -168,3 +168,29 @@ Format: task attempted · steps · expected vs actual · severity · workaround 
   responses remain model-generated. Broader grounded-answer coverage is still follow-up work.
 - **Validation:** Regressions include the reported false date, misleading classification,
   contaminated chat history, changed record values, missing evidence and MCP failures.
+
+## 16. Email reminders require both an identity and an execution lifecycle
+
+- **Task attempted:** Extend the local simulation with proactive SES email reminders.
+- **Steps:** Read SES account status in Singapore; implemented opt-in preview and worker.
+- **Expected vs actual:** SES sending is enabled but production access is false. Bedrock
+  access does not imply SES email identities are verified. The local worker also depends
+  on the Mac staying awake and AWS browser-login credentials staying valid.
+- **Severity:** Medium: a UI toggle alone is not evidence that reminders will arrive.
+- **Workaround:** Explicit verified sender/recipient configuration; local scheduler with
+  persisted attempts and UI status. SES acceptance is shown separately from inbox delivery.
+  Live delivery remains unverified until the chosen address is verified and a test arrives.
+- **Suggestion:** Treat identity verification, scheduling uptime and delivery evidence as
+  separate onboarding checks. Cloud scheduling is a later deployment step.
+
+## 17. Retrying email after a timeout can duplicate a reminder
+
+- **Task attempted:** Make reminder delivery safe across restarts and network failures.
+- **Expected vs actual:** SES SendEmail has no client idempotency token. A failed response
+  can leave uncertainty about whether the service accepted a message.
+- **Severity:** High for duplicate or misleading notifications.
+- **Workaround:** Persist the claim before calling SES, disable SDK retries, retain accepted
+  message IDs, and pause uncertain plans for explicit review. No automatic resend of an
+  unknown outcome. Tests cover competing workers and a crash after the durable claim.
+- **Suggestion:** Add delivery event tracking for a deployed version; do not equate API
+  acceptance with receipt or promise exactly-once inbox delivery.
