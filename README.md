@@ -243,7 +243,7 @@ stops the demo and its child server. Use `--port 8081` if 8080 is occupied.
 1. Ask **What's due soon?** Strands calls `list_due` and `find_conflicts` through MCP;
    **Checks performed** shows the actual calls. The cards use a 60-day horizon and a
    seven-day gap to flag clashes. Chat also fixes the clash gap to seven days.
-2. Choose the synthetic **Insurance ?** sample. The notice lacks a receipt date;
+2. Choose the synthetic **Insurance** sample. The notice lacks a receipt date;
    Duebook asks one question and saves nothing.
 3. Enter **2026-10-01** in the clarification control (a made-up test input), then confirm.
    The resulting deadline is **2026-10-31**. Expand **Source & calculation** to see the
