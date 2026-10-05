@@ -211,9 +211,15 @@ class StrandsBridge:
         ]
         return agent_evidence({"deadlines": deadlines, "conflicts": conflicts})
 
-    def ingest(self, path: str, hint: str | None = None) -> dict:
+    def ingest(
+        self, path: str, hint: str | None = None, confirmed_past_due: str | None = None
+    ) -> dict:
         with self.connect() as client:
-            return self._call(client, "ingest_document", {"path_or_text": path, "hint": hint})
+            return self._call(
+                client,
+                "ingest_document",
+                {"path_or_text": path, "hint": hint, "confirmed_past_due": confirmed_past_due},
+            )
 
     def answer(self, history: list[dict], message: str) -> dict:
         if PROVENANCE_QUESTION.search(message):

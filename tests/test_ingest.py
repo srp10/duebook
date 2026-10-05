@@ -273,3 +273,44 @@ def test_bare_date_does_not_resolve_unrelated_ambiguity(vault_dir):
     )
     assert result["status"] == "needs_confirmation"
     assert not list(vault_dir.iterdir())
+
+
+def test_past_receipt_date_requires_specific_confirmation(vault_dir):
+    path = str(FIXTURES / "insurance-renewal-ambiguous.pdf")
+    args = dict(extractor=extractor("confirmed"), today=date(2026, 10, 5))
+    result = ingest_document(vault_dir, path, "2026-01-05", **args)
+    assert result["confirmation_type"] == "past_due"
+    assert result["candidate"]["due"] == "2026-02-04"
+    assert not read_all(vault_dir)
+    result = ingest_document(vault_dir, path, "2026-01-05", confirmed_past_due="2026-02-03", **args)
+    assert result["status"] == "needs_confirmation"
+    assert not read_all(vault_dir)
+    result = ingest_document(vault_dir, path, "2026-01-05", confirmed_past_due="2026-02-04", **args)
+    assert result["status"] == "saved" and result["overdue"]
+    assert "User clarification: 2026-01-05" in read_all(vault_dir)[0].notes
+    assert "explicitly confirmed" in read_all(vault_dir)[0].notes
+
+
+def test_corrected_receipt_date_and_today_do_not_need_overdue_consent(vault_dir):
+    path = str(FIXTURES / "insurance-renewal-ambiguous.pdf")
+    result = ingest_document(
+        vault_dir, path, "2026-10-05", extractor=extractor("confirmed"), today=date(2026, 10, 5)
+    )
+    assert result["entry"]["due"] == "2026-11-04"
+    assert not result["overdue"]
+    result = ingest_document(
+        vault_dir, path, "2026-09-05", extractor=extractor("confirmed"), today=date(2026, 10, 5)
+    )
+    assert result["entry"]["due"] == "2026-10-05"
+    assert not result["overdue"]
+
+
+def test_direct_past_date_is_guarded(vault_dir):
+    result = ingest_document(
+        vault_dir,
+        str(FIXTURES / "immigration-letter.pdf"),
+        extractor=extractor(),
+        today=date(2026, 12, 1),
+    )
+    assert result["confirmation_type"] == "past_due"
+    assert not read_all(vault_dir)

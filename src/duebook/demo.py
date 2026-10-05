@@ -83,7 +83,10 @@ class DemoService:
             )
         pending = None
         if session.pending:
-            pending = {k: session.pending[k] for k in ("question", "candidate", "filename")}
+            pending = {
+                k: session.pending[k]
+                for k in ("question", "candidate", "filename", "confirmation_type")
+            }
         reminder_state = self.reminders.overview() if self.reminders else None
         if self.reminders:
             records = {
@@ -183,15 +186,34 @@ class DemoService:
             pending = session.pending
             # Use exactly the user's answer. The conversational model cannot invent this input.
             result = self.bridge.ingest(str(pending["path"]), hint.strip())
-            return self._ingestion_result(session, pending["path"], pending["filename"], result)
+            return self._ingestion_result(
+                session, pending["path"], pending["filename"], result, hint.strip()
+            )
 
-    def _ingestion_result(self, session, path, filename, result):
+    def confirm_overdue(self, session_id):
+        session = self.get(session_id)
+        with session.lock:
+            pending = session.pending
+            if not pending or pending.get("confirmation_type") != "past_due":
+                raise DemoError("There is no past deadline waiting for confirmation.")
+            result = self.bridge.ingest(
+                str(pending["path"]),
+                pending.get("hint"),
+                confirmed_past_due=pending["candidate"]["due"],
+            )
+            return self._ingestion_result(
+                session, pending["path"], pending["filename"], result, pending.get("hint")
+            )
+
+    def _ingestion_result(self, session, path, filename, result, hint=None):
         if result["status"] == "needs_confirmation":
             session.pending = {
                 "path": path,
                 "filename": filename,
                 "question": result["question"],
                 "candidate": result["candidate"],
+                "hint": hint,
+                "confirmation_type": result.get("confirmation_type", "clarification"),
             }
             text = result["question"] + " Nothing has been saved yet."
         elif result["status"] == "saved":
@@ -199,7 +221,9 @@ class DemoService:
             path.unlink(missing_ok=True)
             entry = result["entry"]
             text = (
-                f"Saved {entry['title']}, due {entry['due']}. The evidence is in the deadline card."
+                f"Saved {entry['title']}, due {entry['due']}"
+                + (" — overdue, as you confirmed." if result.get("overdue") else ".")
+                + " The evidence is in the deadline card."
             )
         else:
             raise DemoError("The ingestion tool returned an unknown status.")
@@ -295,6 +319,7 @@ def make_handler(service):
                         sid, body.get("filename"), body.get("data")
                     ),
                     "/api/sample": lambda: service.sample(sid, body.get("name")),
+                    "/api/confirm-overdue": lambda: service.confirm_overdue(sid),
                     "/api/confirm": lambda: service.confirm(sid, body.get("hint")),
                     "/api/cancel": lambda: service.cancel(sid),
                 }

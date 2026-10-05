@@ -47,6 +47,8 @@ function render(data) {
   }
   $('messages').scrollTop=$('messages').scrollHeight;
   $('pending').hidden=!data.pending;
+  $('save-overdue').hidden=data.pending?.confirmation_type!=='past_due';
+  $('confirm-form').querySelector('button').textContent=data.pending?.confirmation_type==='past_due'?'Correct date':'Confirm';
   if(data.pending){$('assistant-panel').scrollIntoView({behavior:'smooth',block:'start'}); $('question').textContent=data.pending.question;$('candidate').textContent=`${data.pending.candidate.title} · ${data.pending.filename}`;}
   renderReminders(data);
   $('count').textContent=`${data.deadlines.length} open deadlines · synthetic household`;
@@ -116,6 +118,7 @@ $('new-session').addEventListener('click',()=>perform(async()=>{
 },'Starting a fresh conversation…'));
 $('refresh').addEventListener('click',()=>perform(refresh,'Reading saved deadlines…'));
 $('confirm-form').addEventListener('submit',e=>{e.preventDefault();perform(async()=>{render(await request('/api/confirm',{session,hint:$('hint').value}));$('hint').value='';},'Checking your clarification and saving if the date is clear…');});
+$('save-overdue').addEventListener('click',()=>perform(async()=>{render(await request('/api/confirm-overdue',{session}));$('hint').value='';},'Confirming the overdue date…'));
 $('cancel').addEventListener('click',()=>perform(async()=>render(await request('/api/cancel',{session})))) ;
 document.querySelectorAll('[data-sample]').forEach(b=>b.addEventListener('click',()=>perform(async()=>render(await request('/api/sample',{session,name:b.dataset.sample})),'Reading the synthetic sample through Bedrock…')));
 async function upload(file){

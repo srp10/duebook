@@ -60,15 +60,21 @@ def find_conflicts(window_days: int = 7) -> list[dict]:
 
 
 @mcp.tool()
-def ingest_document(path_or_text: str, hint: str | None = None) -> dict:
+def ingest_document(
+    path_or_text: str, hint: str | None = None, confirmed_past_due: str | None = None
+) -> dict:
     """Extract one deadline from PDF/txt/eml path or pasted text using Amazon Bedrock.
 
     Sends document text to AWS. A clear, validated deadline is saved with a source quote.
     On needs_confirmation, ask the returned question and call again with the SAME
     document and the user's answer in hint. Never guess an answer for the user.
+    For confirmation_type past_due, only after explicit user approval pass the returned
+    candidate due date as confirmed_past_due, preserving the previous hint. Never infer consent.
     Scans are unsupported. Duplicates are refused; uncertain results never write files.
     """
-    return ingest.ingest_document(VAULT_DIR, path_or_text, hint)
+    return ingest.ingest_document(
+        VAULT_DIR, path_or_text, hint, confirmed_past_due=confirmed_past_due
+    )
 
 
 def main() -> None:

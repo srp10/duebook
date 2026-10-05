@@ -331,3 +331,32 @@ def test_provenance_tool_failure_never_falls_back_to_model(monkeypatch):
     monkeypatch.setattr(bridge, "_call", fail)
     with pytest.raises(DemoError, match="MCP unavailable"):
         bridge.answer([], "Where did the receipt date come from?")
+
+
+def test_overdue_button_preserves_hint_and_requires_pending_past_date(service):
+    sid = service.create()["session"]
+    with pytest.raises(DemoError):
+        service.confirm_overdue(sid)
+    upload(service, sid)
+    calls = []
+
+    def ingest(path, hint=None, confirmed_past_due=None):
+        calls.append((hint, confirmed_past_due))
+        candidate = {"title": "Insurance", "due": "2026-02-04"}
+        if not confirmed_past_due:
+            return {
+                "status": "needs_confirmation",
+                "confirmation_type": "past_due",
+                "candidate": candidate,
+                "question": "Past date: confirm or correct.",
+            }
+        return {"status": "saved", "entry": candidate, "overdue": True}
+
+    service.bridge.ingest = ingest
+    result = service.confirm(sid, "2026-01-05")
+    assert result["pending"]["confirmation_type"] == "past_due"
+    assert "hint" not in result["pending"]
+    result = service.confirm_overdue(sid)
+    assert calls[-1] == ("2026-01-05", "2026-02-04")
+    assert result["pending"] is None
+    assert "overdue, as you confirmed" in result["messages"][-1]["text"]
