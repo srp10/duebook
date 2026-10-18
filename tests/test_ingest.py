@@ -330,3 +330,63 @@ def test_expired_login_has_recovery_instructions_without_writes(vault_dir, code)
         )
     assert "aws login --profile duebook" in str(error.value)
     assert not read_all(vault_dir)
+
+
+@pytest.mark.parametrize("fault", ["missing", "quote", "truncated"])
+def test_invalid_response_retried_once_and_only_validated_result_saved(vault_dir, fault):
+    good = ReplayClient().response
+    bad = copy.deepcopy(good)
+    fields = bad["output"]["message"]["content"][0]["toolUse"]["input"]
+    if fault == "missing":
+        fields.pop("notes")
+    elif fault == "quote":
+        fields["source"] = "This is not documentary evidence."
+    else:
+        bad["stopReason"] = "max_tokens"
+
+    class SequenceClient:
+        def __init__(self):
+            self.requests = []
+
+        def converse(self, **kwargs):
+            assert not list(vault_dir.iterdir())
+            self.requests.append(kwargs)
+            return copy.deepcopy(bad if len(self.requests) == 1 else good)
+
+    client = SequenceClient()
+    result = ingest_document(
+        vault_dir, str(FIXTURES / "immigration-letter.pdf"), extractor=BedrockExtractor(client)
+    )
+    assert result["status"] == "saved"
+    assert len(client.requests) == 2
+    assert "ALL required fields" in client.requests[1]["system"][0]["text"]
+    assert client.requests[0]["messages"] == client.requests[1]["messages"]
+    assert len(read_all(vault_dir)) == 1
+
+
+def test_repeated_invalid_response_stops_after_two_calls_without_writing(vault_dir):
+    client = ReplayClient()
+    client.response["output"]["message"]["content"][0]["toolUse"]["input"].pop("notes")
+    with pytest.raises(ExtractionError, match="missing or unexpected"):
+        ingest_document(
+            vault_dir, str(FIXTURES / "immigration-letter.pdf"), extractor=BedrockExtractor(client)
+        )
+    assert len(client.requests) == 2
+    assert not list(vault_dir.iterdir())
+
+
+def test_auth_failure_is_not_retried_as_model_repair(vault_dir):
+    class ExpiredClient:
+        calls = 0
+
+        def converse(self, **kwargs):
+            self.calls += 1
+            raise ClientError({"Error": {"Code": "ExpiredToken"}}, "Converse")
+
+    client = ExpiredClient()
+    with pytest.raises(ExtractionError, match="session has expired"):
+        ingest_document(
+            vault_dir, str(FIXTURES / "immigration-letter.pdf"), extractor=BedrockExtractor(client)
+        )
+    assert client.calls == 1
+    assert not list(vault_dir.iterdir())

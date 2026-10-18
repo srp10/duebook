@@ -207,3 +207,21 @@ Format: task attempted · steps · expected vs actual · severity · workaround 
   No local plans are automatically migrated. Lambda reserved concurrency stays at one,
   and durable pre-send claims prevent automatic retries of ambiguous email sends.
 - **Suggestion:** a later authenticated cloud vault could make edits authoritative everywhere.
+
+
+## 19. Required fields can still be missing from tool output (2026-10-18)
+
+- **Task attempted:** rehearse the insurance upload in the recording UI.
+- **Steps:** click Insurance with live Nova Lite and the forced extraction tool schema.
+- **Expected vs actual:** all required fields should be returned. The browser received a
+  response with missing or unexpected fields even though a separate fixture run passed.
+  Validation correctly refused to save, but the raw error interrupted the demo.
+- **Severity:** medium; blocks a recording and everyday ingestion until retried.
+- **Workaround:** regenerate invalid structured output once with validation feedback and
+  an explicit required-field list. Keep source grounding and all validators unchanged;
+  do not fill absent evidence with defaults. Authentication failures are not retried as
+  model repairs. Three live insurance clarification/save rehearsals passed, each recovering
+  from the observed malformed initial response. Offline tests cover repair success,
+  repeated failure with no writes, ungrounded quotes and authentication failure boundaries.
+- **Suggestion:** schema-constrained tool generation should enforce required fields, or
+  clearly document validation and bounded recovery patterns for callers.

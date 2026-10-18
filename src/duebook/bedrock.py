@@ -1,4 +1,4 @@
-"""One bounded Bedrock call returning a schema-shaped extraction, never parsed prose."""
+"""Bounded structured extraction with one validation retry; never parsed prose."""
 
 import json
 import logging
@@ -58,6 +58,10 @@ class ExtractionError(ValueError):
     """No trustworthy structured extraction was returned; nothing should be saved."""
 
 
+class ModelResponseError(ExtractionError):
+    """Invalid structured model output, eligible for one bounded regeneration."""
+
+
 def normalize(text: str) -> str:
     return " ".join(text.split())
 
@@ -65,27 +69,27 @@ def normalize(text: str) -> str:
 def validate(candidate: object, document: str) -> dict:
     """Validate every model field and ground its quote before the caller can write."""
     if not isinstance(candidate, dict) or set(candidate) != set(FIELDS):
-        raise ExtractionError("Model returned missing or unexpected fields; nothing was saved.")
+        raise ModelResponseError("Model returned missing or unexpected fields; nothing was saved.")
     for key in set(FIELDS) - {"confidence", "ambiguities"}:
         if not isinstance(candidate[key], str):
-            raise ExtractionError(f"Model field {key} must be text; nothing was saved.")
+            raise ModelResponseError(f"Model field {key} must be text; nothing was saved.")
     for key in ("title", "source", "kind_reason"):
         if not candidate[key].strip():
-            raise ExtractionError(f"Model field {key} is empty; nothing was saved.")
+            raise ModelResponseError(f"Model field {key} is empty; nothing was saved.")
     if candidate["kind"] not in ("hard", "soft"):
-        raise ExtractionError("Model returned an invalid deadline kind; nothing was saved.")
+        raise ModelResponseError("Model returned an invalid deadline kind; nothing was saved.")
     confidence = candidate["confidence"]
     if (
         type(confidence) not in (int, float)
         or not math.isfinite(confidence)
         or not 0 <= confidence <= 1
     ):
-        raise ExtractionError("Model confidence must be a number between 0 and 1.")
+        raise ModelResponseError("Model confidence must be a number between 0 and 1.")
     ambiguities = candidate["ambiguities"]
     if not isinstance(ambiguities, list) or any(
         not isinstance(a, str) or not a.strip() for a in ambiguities
     ):
-        raise ExtractionError("Model ambiguities must be a list of nonempty strings.")
+        raise ModelResponseError("Model ambiguities must be a list of nonempty strings.")
     for key in ("due", "window_start"):
         value = candidate[key]
         if value:
@@ -94,11 +98,13 @@ def validate(candidate: object, document: str) -> dict:
                     raise ValueError
                 date.fromisoformat(value)
             except ValueError:
-                raise ExtractionError(f"Model {key} is not a valid YYYY-MM-DD date.") from None
+                raise ModelResponseError(f"Model {key} is not a valid YYYY-MM-DD date.") from None
     if candidate["due"] and candidate["window_start"] > candidate["due"]:
-        raise ExtractionError("Renewal window starts after the deadline; nothing was saved.")
+        raise ModelResponseError("Renewal window starts after the deadline; nothing was saved.")
     if normalize(candidate["source"]) not in normalize(document):
-        raise ExtractionError("The source quote does not occur in the document; nothing was saved.")
+        raise ModelResponseError(
+            "The source quote does not occur in the document; nothing was saved."
+        )
     return candidate
 
 
@@ -189,6 +195,24 @@ class BedrockExtractor:
         self.model_id = model_id or os.environ.get("DUEBOOK_MODEL_ID", MODEL)
 
     def extract(self, document: str, hint: str | None = None) -> dict:
+        repair = ""
+        for attempt in range(2):
+            try:
+                return self._extract(document, hint, repair)
+            except ModelResponseError as exc:
+                if attempt:
+                    raise
+                LOG.warning("Invalid structured extraction; regenerating once: %s", exc)
+                repair = (
+                    "\nThe previous extraction failed validation: "
+                    + str(exc)
+                    + " Regenerate from the original evidence. Include ALL required fields: "
+                    + ", ".join(FIELDS)
+                    + ". Use empty strings for absent optional text; do not invent evidence."
+                )
+        raise AssertionError("Unreachable")
+
+    def _extract(self, document: str, hint: str | None, repair: str) -> dict:
         # A bare ISO date answers the receipt-date question in this document context.
         # Expand it before extraction too, so the model sees the same resolved meaning.
         if (
@@ -214,7 +238,7 @@ class BedrockExtractor:
                 )
             response = self.client.converse(
                 modelId=self.model_id,
-                system=[{"text": SYSTEM}],
+                system=[{"text": SYSTEM + repair}],
                 messages=[
                     {
                         "role": "user",
@@ -271,7 +295,7 @@ class BedrockExtractor:
             or len(calls) != 1
             or calls[0].get("name") != TOOL
         ):
-            raise ExtractionError(
+            raise ModelResponseError(
                 "Expected one complete extraction tool response; nothing was saved."
             )
         candidate = ground_date(validate(calls[0].get("input"), text), text, hint)

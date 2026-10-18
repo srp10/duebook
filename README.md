@@ -179,7 +179,10 @@ ambiguities or clarification questions prevent writes. Renewal windows and notes
 
 ### Cost and input limits
 
-One Converse request per ingestion attempt (at most two HTTP attempts on transient failures).
+At most two Converse requests per ingestion attempt: invalid structured output is regenerated
+once with validation feedback. Each request allows at most two HTTP attempts on transient
+failures. Authentication errors do not trigger model regeneration. Both responses must pass
+the same validation; if the second is invalid, nothing is saved.
 The document plus hint is capped at 12,000 characters before JSON serialization; fixed
 prompt/schema overhead is additional. Hints are limited to 2,000 characters. Long documents
 use head + tail and **always require clarification** with a shorter relevant section.
